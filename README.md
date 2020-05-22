@@ -1,10 +1,13 @@
-# DeepMimicX
+# Munvo Message Gateway Simulator
+
+Simulation environment for Message Gateway Model Pattern Generation.
 
 # Summary
 
 Derivative of DeepMimic project for researching the viability of the experiments outlined below.
 
 Researcher(s): ajay.bhaga@gmail.com / ajay.bhaga@munvo.com
+www.munvo.com
 
 Using referential models to drive RL-based learning goals for:
 
