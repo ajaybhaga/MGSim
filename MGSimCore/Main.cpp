@@ -338,7 +338,7 @@ void InitDraw(int argc, char** argv)
 
 	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
 	glutInitWindowSize(gWinWidth, gWinHeight);
-	glutCreateWindow("DeepMimic");
+	glutCreateWindow("MGSim");
 }
 
 void SetupDraw()

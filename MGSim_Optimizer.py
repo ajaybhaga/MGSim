@@ -1,6 +1,6 @@
 import numpy as np
 import sys
-from env.deepmimic_env import DeepMimicEnv
+from env.mgsim_env import MGSimEnv
 from learning.rl_world import RLWorld
 from util.logger import Logger
 from MGSim import update_world, update_timestep, build_world

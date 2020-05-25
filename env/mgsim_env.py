@@ -17,7 +17,7 @@ class MGSimEnv(Env):
 
         t = time.localtime()
         current_time = time.strftime("%H:%M:%S", t)
-        Logger.print('MGSimInitProject executing @ ' + current_time)
+        Logger.print('MGSimCore environment initializing @ ' + current_time)
 
         self._core.ParseArgs(args)
         self._core.Init()
