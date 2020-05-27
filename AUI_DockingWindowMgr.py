@@ -261,7 +261,7 @@ class PyAUIFrame(wx.Frame):
                           Bottom().Layer(1).CloseButton(True).MaximizeButton(True))
 
         self._mgr.AddPane(self.CreateTextCtrl(), aui.AuiPaneInfo().
-                          Name("test10").Caption("Text Pane").
+                          Name("status1_txtctrl").Caption("Status").
                           Bottom().Layer(1).Position(1).CloseButton(True).MaximizeButton(True))
 
         self._mgr.AddPane(self.CreateSizeReportCtrl(), aui.AuiPaneInfo().
@@ -283,7 +283,7 @@ class PyAUIFrame(wx.Frame):
         self._mgr.AddPane(self.CreateSizeReportCtrl(), aui.AuiPaneInfo().Name("sizereport_content").
                           CenterPane().Hide())
 
-        self._mgr.AddPane(self.CreateTextCtrl(), aui.AuiPaneInfo().Name("text_content").
+        self._mgr.AddPane(self.CreateTextCtrl(), aui.AuiPaneInfo().Name("text_content").Caption("test A").
                           CenterPane().Hide())
 
         self._mgr.AddPane(self.CreateHTMLCtrl(), aui.AuiPaneInfo().Name("html_content").
@@ -639,7 +639,7 @@ class PyAUIFrame(wx.Frame):
 
     def OnCreateText(self, event):
         self._mgr.AddPane(self.CreateTextCtrl(), aui.AuiPaneInfo().
-                          Caption("Text Control").
+                          Caption("Text 2").
                           Float().FloatingPosition(self.GetStartPosition()).
                           CloseButton(True).MaximizeButton(True))
         self._mgr.Update()

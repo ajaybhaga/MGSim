@@ -15,7 +15,7 @@ for iterative training.  This simulator provides a workbench to tweak models
 to meet preferred goals.  The generates patterns that can be used to deploy
 on Message Gateway to validate accuracy of results.
 
-- wxPython to manage cross-platform window management.
+- wxPython to manage cross-platform window management
 - PostgreSQL server to manage internal system metadata
 - TensorFlow for deep reinforcement learning
 - wx.OGL for 2D graphic management
@@ -88,6 +88,16 @@ ID_HorizontalGradient = wx.NewIdRef()
 ID_Settings = wx.NewIdRef()
 ID_About = wx.NewIdRef()
 
+ID_NavData = wx.NewIdRef()
+ID_NavModel = wx.NewIdRef()
+ID_NavExpr = wx.NewIdRef()
+ID_NavResults = wx.NewIdRef()
+
+ID_LoadModel = wx.NewIdRef()
+ID_SaveModel = wx.NewIdRef()
+ID_ExportPattern = wx.NewIdRef()
+
+
 # This reserves count IDs and returns a list of WindowIDRef objects
 ID_FirstPerspective = wx.NewIdRef(100)
 
@@ -141,10 +151,6 @@ class PyAUIFrame(wx.Frame):
 
         wx.Frame.__init__(self, parent, id, title, pos, size, style)
 
-        #frame = wx.Frame(None, -1, "Munvo Message Gateway: " + self.name, size=(200,100),
-        #                 style=wx.DEFAULT_FRAME_STYLE, name="run a sample")
-
-
         # tell FrameManager to manage this frame
         self._mgr = aui.AuiManager()
         self._mgr.SetManagedWindow(self)
@@ -159,20 +165,23 @@ class PyAUIFrame(wx.Frame):
         mb = wx.MenuBar()
 
         file_menu = wx.Menu()
+        file_menu.Append(ID_LoadModel, "Load Model")
+        file_menu.Append(ID_SaveModel, "Save Model")
+        file_menu.Append(ID_ExportPattern, "Export Pattern")
         file_menu.Append(wx.ID_EXIT, "Exit")
 
-        view_menu = wx.Menu()
-        view_menu.Append(ID_CreateText, "Create Text Control")
-        view_menu.Append(ID_CreateHTML, "Create HTML Control")
-        view_menu.Append(ID_CreateTree, "Create Tree")
-        view_menu.Append(ID_CreateGrid, "Create Grid")
-        view_menu.Append(ID_CreateSizeReport, "Create Size Reporter")
-        view_menu.AppendSeparator()
-        view_menu.Append(ID_GridContent, "Use a Grid for the Content Pane")
-        view_menu.Append(ID_TextContent, "Use a Text Control for the Content Pane")
-        view_menu.Append(ID_HTMLContent, "Use an HTML Control for the Content Pane")
-        view_menu.Append(ID_TreeContent, "Use a Tree Control for the Content Pane")
-        view_menu.Append(ID_SizeReportContent, "Use a Size Reporter for the Content Pane")
+        #view_menu = wx.Menu()
+        #view_menu.Append(ID_CreateText, "Create Text Control")
+        #view_menu.Append(ID_CreateHTML, "Create HTML Control")
+        #view_menu.Append(ID_CreateTree, "Create Tree")
+        #view_menu.Append(ID_CreateGrid, "Create Grid")
+        #view_menu.Append(ID_CreateSizeReport, "Create Size Reporter")
+        #view_menu.AppendSeparator()
+        #view_menu.Append(ID_GridContent, "Use a Grid for the Content Pane")
+        #view_menu.Append(ID_TextContent, "Use a Text Control for the Content Pane")
+        #view_menu.Append(ID_HTMLContent, "Use an HTML Control for the Content Pane")
+        #view_menu.Append(ID_TreeContent, "Use a Tree Control for the Content Pane")
+        #view_menu.Append(ID_SizeReportContent, "Use a Size Reporter for the Content Pane")
 
         options_menu = wx.Menu()
         options_menu.AppendRadioItem(ID_TransparentHint, "Transparent Hint")
@@ -192,20 +201,20 @@ class PyAUIFrame(wx.Frame):
         options_menu.AppendSeparator();
         options_menu.Append(ID_Settings, "Settings Pane")
 
-        self._perspectives_menu = wx.Menu()
-        self._perspectives_menu.Append(ID_CreatePerspective, "Create Perspective")
-        self._perspectives_menu.Append(ID_CopyPerspective, "Copy Perspective Data To Clipboard")
-        self._perspectives_menu.AppendSeparator()
-        self._perspectives_menu.Append(ID_FirstPerspective[0], "Default Startup")
-        self._perspectives_menu.Append(ID_FirstPerspective[1], "All Panes")
-        self._perspectives_menu.Append(ID_FirstPerspective[2], "Vertical Toolbar")
+        #self._perspectives_menu = wx.Menu()
+        #self._perspectives_menu.Append(ID_CreatePerspective, "Create Perspective")
+        #self._perspectives_menu.Append(ID_CopyPerspective, "Copy Perspective Data To Clipboard")
+        #self._perspectives_menu.AppendSeparator()
+        #self._perspectives_menu.Append(ID_FirstPerspective[0], "Default Startup")
+        #self._perspectives_menu.Append(ID_FirstPerspective[1], "All Panes")
+        #self._perspectives_menu.Append(ID_FirstPerspective[2], "Vertical Toolbar")
 
         help_menu = wx.Menu()
         help_menu.Append(ID_About, "About...")
 
         mb.Append(file_menu, "File")
-        mb.Append(view_menu, "View")
-        mb.Append(self._perspectives_menu, "Perspectives")
+        #mb.Append(view_menu, "View")
+        #mb.Append(self._perspectives_menu, "Perspectives")
         mb.Append(options_menu, "Options")
         mb.Append(help_menu, "Help")
 
@@ -214,7 +223,7 @@ class PyAUIFrame(wx.Frame):
         self.statusbar = self.CreateStatusBar(2, wx.STB_SIZEGRIP)
         self.statusbar.SetStatusWidths([-2, -3])
         self.statusbar.SetStatusText("Ready", 0)
-        self.statusbar.SetStatusText("Welcome To wxPython!", 1)
+        self.statusbar.SetStatusText("Please load model.", 1)
 
         # min size for the frame itself isn't completely done.
         # see the end up FrameManager::Update() for the test
@@ -222,63 +231,38 @@ class PyAUIFrame(wx.Frame):
         self.SetMinSize(wx.Size(400, 300))
 
         # create some toolbars
-        tb1 = wx.ToolBar(self, -1, wx.DefaultPosition, wx.DefaultSize,
-                         wx.TB_FLAT | wx.TB_NODIVIDER)
-        tb1.SetToolBitmapSize(wx.Size(48,48))
-        tb1.AddTool(101, "Test", wx.ArtProvider.GetBitmap(wx.ART_ERROR))
-        tb1.AddSeparator()
-        tb1.AddTool(102, "Test", wx.ArtProvider.GetBitmap(wx.ART_QUESTION))
-        tb1.AddTool(103, "Test", wx.ArtProvider.GetBitmap(wx.ART_INFORMATION))
-        tb1.AddTool(103, "Test", wx.ArtProvider.GetBitmap(wx.ART_WARNING))
-        tb1.AddTool(103, "Test", wx.ArtProvider.GetBitmap(wx.ART_MISSING_IMAGE))
-        tb1.Realize()
-
-        tb2 = wx.ToolBar(self, -1, wx.DefaultPosition, wx.DefaultSize,
-                         wx.TB_FLAT | wx.TB_NODIVIDER)
-        tb2.SetToolBitmapSize(wx.Size(16,16))
-        tb2_bmp1 = wx.ArtProvider.GetBitmap(wx.ART_QUESTION, wx.ART_OTHER, wx.Size(16, 16))
-        tb2.AddTool(101, "Test", tb2_bmp1)
-        tb2.AddTool(101, "Test", tb2_bmp1)
-        tb2.AddTool(101, "Test", tb2_bmp1)
-        tb2.AddTool(101, "Test", tb2_bmp1)
-        tb2.AddSeparator()
-        tb2.AddTool(101, "Test", tb2_bmp1)
-        tb2.AddTool(101, "Test", tb2_bmp1)
-        tb2.AddSeparator()
-        tb2.AddTool(101, "Test", tb2_bmp1)
-        tb2.AddTool(101, "Test", tb2_bmp1)
-        tb2.AddTool(101, "Test", tb2_bmp1)
-        tb2.AddTool(101, "Test", tb2_bmp1)
-        tb2.Realize()
+        filenew_bmp1 = wx.ArtProvider.GetBitmap(wx.ART_NEW, wx.ART_TOOLBAR, wx.Size(16, 16))
+        fileopen_bmp1 = wx.ArtProvider.GetBitmap(wx.ART_FILE_OPEN, wx.ART_TOOLBAR, wx.Size(16, 16))
+        filesave_bmp1 = wx.ArtProvider.GetBitmap(wx.ART_FILE_SAVE, wx.ART_TOOLBAR, wx.Size(16, 16))
+        patternexp_bmp1 = wx.ArtProvider.GetBitmap(wx.ART_FILE_SAVE_AS, wx.ART_TOOLBAR, wx.Size(16, 16))
+        disk_bmp1 = wx.ArtProvider.GetBitmap(wx.ART_HARDDISK, wx.ART_TOOLBAR, wx.Size(16, 16))
+        model_bmp1 = wx.ArtProvider.GetBitmap(wx.ART_LIST_VIEW, wx.ART_TOOLBAR, wx.Size(16, 16))
+        result_bmp1 = wx.ArtProvider.GetBitmap(wx.ART_REPORT_VIEW, wx.ART_TOOLBAR, wx.Size(16, 16))
+        expr_bmp1 = wx.ArtProvider.GetBitmap(wx.ART_EXECUTABLE_FILE, wx.ART_TOOLBAR, wx.Size(16, 16))
 
         tb3 = wx.ToolBar(self, -1, wx.DefaultPosition, wx.DefaultSize,
-                         wx.TB_FLAT | wx.TB_NODIVIDER)
+                         wx.TB_FLAT | wx.TB_HORZ_TEXT)
         tb3.SetToolBitmapSize(wx.Size(16,16))
-        tb3_bmp1 = wx.ArtProvider.GetBitmap(wx.ART_FOLDER, wx.ART_OTHER, wx.Size(16, 16))
-        tb3.AddTool(101, "Test", tb3_bmp1)
-        tb3.AddTool(101, "Test", tb3_bmp1)
-        tb3.AddTool(101, "Test", tb3_bmp1)
-        tb3.AddTool(101, "Test", tb3_bmp1)
-        tb3.AddSeparator()
-        tb3.AddTool(101, "Test", tb3_bmp1)
-        tb3.AddTool(101, "Test", tb3_bmp1)
+        tb3.AddTool(101, "New Simulation", filenew_bmp1)
+        tb3.AddTool(101, "Load Model", fileopen_bmp1)
+        tb3.AddTool(101, "Save Model", filesave_bmp1)
+        tb3.AddTool(101, "Export Pattern", patternexp_bmp1)
+#        tb3.AddSeparator()
+#        tb3.AddTool(101, "Test", tb3_bmp1)
+#        tb3.AddTool(101, "Test", tb3_bmp1)
         tb3.Realize()
 
+
         tb4 = wx.ToolBar(self, -1, wx.DefaultPosition, wx.DefaultSize,
-                         wx.TB_FLAT | wx.TB_NODIVIDER | wx.TB_HORZ_TEXT)
+                         wx.TB_FLAT | wx.TB_NODIVIDER | wx.TB_HORZ_TEXT | wx.TB_VERTICAL)
         tb4.SetToolBitmapSize(wx.Size(16,16))
-        tb4_bmp1 = wx.ArtProvider.GetBitmap(wx.ART_NORMAL_FILE, wx.ART_OTHER, wx.Size(16, 16))
-        tb4.AddTool(101, "Item 1", tb4_bmp1)
-        tb4.AddTool(101, "Item 2", tb4_bmp1)
-        tb4.AddTool(101, "Item 3", tb4_bmp1)
-        tb4.AddTool(101, "Item 4", tb4_bmp1)
-        tb4.AddSeparator()
-        tb4.AddTool(101, "Item 5", tb4_bmp1)
-        tb4.AddTool(101, "Item 6", tb4_bmp1)
-        tb4.AddTool(101, "Item 7", tb4_bmp1)
-        tb4.AddTool(101, "Item 8", tb4_bmp1)
+        tb4.AddTool(101, "Data", disk_bmp1)
+        tb4.AddTool(101, "Model", model_bmp1)
+        tb4.AddTool(101, "Experiment", expr_bmp1)
+        tb4.AddTool(101, "Results", result_bmp1)
         tb4.Realize()
 
+        '''
         tb5 = wx.ToolBar(self, -1, wx.DefaultPosition, wx.DefaultSize,
                          wx.TB_FLAT | wx.TB_NODIVIDER | wx.TB_VERTICAL)
         tb5.SetToolBitmapSize(wx.Size(48, 48))
@@ -289,47 +273,15 @@ class PyAUIFrame(wx.Frame):
         tb5.AddTool(103, "Test", wx.ArtProvider.GetBitmap(wx.ART_WARNING))
         tb5.AddTool(103, "Test", wx.ArtProvider.GetBitmap(wx.ART_MISSING_IMAGE))
         tb5.Realize()
+        '''
 
         # add a bunch of panes
-        self._mgr.AddPane(self.CreateSizeReportCtrl(), aui.AuiPaneInfo().
-                          Name("test1").Caption("Pane Caption").Top().
-                          CloseButton(True).MaximizeButton(True))
-
-        self._mgr.AddPane(self.CreateSizeReportCtrl(), aui.AuiPaneInfo().
-                          Name("test2").Caption("Client Size Reporter").
-                          Bottom().Position(1).CloseButton(True).MaximizeButton(True))
-
-        self._mgr.AddPane(self.CreateSizeReportCtrl(), aui.AuiPaneInfo().
-                          Name("test3").Caption("Client Size Reporter").
-                          Bottom().CloseButton(True).MaximizeButton(True))
-
-        self._mgr.AddPane(self.CreateSizeReportCtrl(), aui.AuiPaneInfo().
-                          Name("test4").Caption("Pane Caption").
-                          Left().CloseButton(True).MaximizeButton(True))
-
-        self._mgr.AddPane(self.CreateSizeReportCtrl(), aui.AuiPaneInfo().
-                          Name("test5").Caption("Pane Caption").
-                          Right().CloseButton(True).MaximizeButton(True))
-
-        self._mgr.AddPane(self.CreateSizeReportCtrl(), aui.AuiPaneInfo().
-                          Name("test6").Caption("Client Size Reporter").
-                          Right().Row(1).CloseButton(True).MaximizeButton(True))
-
-        self._mgr.AddPane(self.CreateSizeReportCtrl(), aui.AuiPaneInfo().
-                          Name("test7").Caption("Client Size Reporter").
-                          Left().Layer(1).CloseButton(True).MaximizeButton(True))
-
         self._mgr.AddPane(self.CreateTreeCtrl(), aui.AuiPaneInfo().
-                          Name("test8").Caption("Tree Pane").
+                          Name("datatree1").Caption("Data Tree Pane").
                           Left().Layer(1).Position(1).CloseButton(True).MaximizeButton(True))
 
-        self._mgr.AddPane(self.CreateSizeReportCtrl(), aui.AuiPaneInfo().
-                          Name("test9").Caption("Min Size 200x100").
-                          BestSize(wx.Size(200,100)).MinSize(wx.Size(200,100)).
-                          Bottom().Layer(1).CloseButton(True).MaximizeButton(True))
-
-        self._mgr.AddPane(self.CreateTextCtrl(), aui.AuiPaneInfo().
-                          Name("test10").Caption("Text Pane").
+        self._mgr.AddPane(self.CreateStatusTextCtrl(), aui.AuiPaneInfo().
+                          Name("status1").Caption("Status").
                           Bottom().Layer(1).Position(1).CloseButton(True).MaximizeButton(True))
 
         self._mgr.AddPane(self.CreateSizeReportCtrl(), aui.AuiPaneInfo().
@@ -340,59 +292,18 @@ class PyAUIFrame(wx.Frame):
                           Name("settings").Caption("Dock Manager Settings").
                           Dockable(False).Float().Hide().CloseButton(True).MaximizeButton(True))
 
-        # create some center panes
-
-        self._mgr.AddPane(self.CreateGrid(), aui.AuiPaneInfo().Name("grid_content").
-                          CenterPane().Hide())
-
-        self._mgr.AddPane(self.CreateTreeCtrl(), aui.AuiPaneInfo().Name("tree_content").
-                          CenterPane().Hide())
-
-        self._mgr.AddPane(self.CreateSizeReportCtrl(), aui.AuiPaneInfo().Name("sizereport_content").
-                          CenterPane().Hide())
-
-        self._mgr.AddPane(self.CreateTextCtrl(), aui.AuiPaneInfo().Name("text_content").
-                          CenterPane().Hide())
-
-        self._mgr.AddPane(self.CreateHTMLCtrl(), aui.AuiPaneInfo().Name("html_content").
-                          CenterPane())
-
         # add the toolbars to the manager
-
-        self._mgr.AddPane(tb1, aui.AuiPaneInfo().
-                          Name("tb1").Caption("Big Toolbar").
+        self._mgr.AddPane(tb3, aui.AuiPaneInfo().
+                          Name("tb3").Caption("Simulation Toolbar").
                           ToolbarPane().Top().
                           LeftDockable(False).RightDockable(False))
 
-        self._mgr.AddPane(tb2, aui.AuiPaneInfo().
-                          Name("tb2").Caption("Toolbar 2").
-                          ToolbarPane().Top().Row(1).
-                          LeftDockable(False).RightDockable(False))
-
-        self._mgr.AddPane(tb3, aui.AuiPaneInfo().
-                          Name("tb3").Caption("Toolbar 3").
-                          ToolbarPane().Top().Row(1).Position(1).
-                          LeftDockable(False).RightDockable(False))
-
         self._mgr.AddPane(tb4, aui.AuiPaneInfo().
-                          Name("tb4").Caption("Sample Bookmark Toolbar").
-                          ToolbarPane().Top().Row(2).
-                          LeftDockable(False).RightDockable(False))
-
-        self._mgr.AddPane(tb5, aui.AuiPaneInfo().
-                          Name("tbvert").Caption("Sample Vertical Toolbar").
+                          Name("tb4").Caption("Navigator Toolbar").
                           ToolbarPane().Left().GripperTop().
                           TopDockable(False).BottomDockable(False))
 
-        self._mgr.AddPane(wx.Button(self, -1, "Test Button"),
-                          aui.AuiPaneInfo().Name("tb5").
-                          ToolbarPane().Top().Row(2).Position(1).
-                          LeftDockable(False).RightDockable(False))
-
         # make some default perspectives
-
-        self._mgr.GetPane("tbvert").Hide()
-
         perspective_all = self._mgr.SavePerspective()
 
         all_panes = self._mgr.GetAllPanes()
@@ -403,8 +314,8 @@ class PyAUIFrame(wx.Frame):
 
         self._mgr.GetPane("tb1").Hide()
         self._mgr.GetPane("tb5").Hide()
-        self._mgr.GetPane("test8").Show().Left().Layer(0).Row(0).Position(0)
-        self._mgr.GetPane("test10").Show().Bottom().Layer(0).Row(0).Position(0)
+        self._mgr.GetPane("datatree1").Show().Left().Layer(0).Row(0).Position(0)
+        self._mgr.GetPane("status1").Show().Bottom().Layer(0).Row(0).Position(0)
         self._mgr.GetPane("html_content").Show()
 
         perspective_default = self._mgr.SavePerspective()
@@ -415,10 +326,9 @@ class PyAUIFrame(wx.Frame):
 
         self._mgr.GetPane("tb1").Hide()
         self._mgr.GetPane("tb5").Hide()
-        self._mgr.GetPane("tbvert").Show()
         self._mgr.GetPane("grid_content").Show()
-        self._mgr.GetPane("test8").Show().Left().Layer(0).Row(0).Position(0)
-        self._mgr.GetPane("test10").Show().Bottom().Layer(0).Row(0).Position(0)
+        self._mgr.GetPane("datatree1").Show().Left().Layer(0).Row(0).Position(0)
+        self._mgr.GetPane("status1").Show().Bottom().Layer(0).Row(0).Position(0)
         self._mgr.GetPane("html_content").Show()
 
         perspective_vert = self._mgr.SavePerspective()
@@ -427,7 +337,6 @@ class PyAUIFrame(wx.Frame):
         self._perspectives.append(perspective_all)
         self._perspectives.append(perspective_vert)
 
-        self._mgr.GetPane("tbvert").Hide()
         self._mgr.GetPane("grid_content").Hide()
 
         # "commit" all changes made to FrameManager
@@ -447,6 +356,11 @@ class PyAUIFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.OnCreateSizeReport, id=ID_CreateSizeReport)
         self.Bind(wx.EVT_MENU, self.OnCreatePerspective, id=ID_CreatePerspective)
         self.Bind(wx.EVT_MENU, self.OnCopyPerspective, id=ID_CopyPerspective)
+
+        self.Bind(wx.EVT_MENU, self.OnNavData, id=ID_NavData)
+        self.Bind(wx.EVT_MENU, self.OnNavModel, id=ID_NavModel)
+        self.Bind(wx.EVT_MENU, self.OnNavExpr, id=ID_NavExpr)
+        self.Bind(wx.EVT_MENU, self.OnNavResults, id=ID_NavResults)
 
         self.Bind(wx.EVT_MENU, self.OnManagerFlag, id=ID_AllowFloating)
         self.Bind(wx.EVT_MENU, self.OnManagerFlag, id=ID_TransparentHint)
@@ -525,7 +439,7 @@ class PyAUIFrame(wx.Frame):
     def OnAbout(self, event):
 
         msg = "Munvo Message Gateway: Simulator\n" + \
-              "Message Gateway Simulator which produces referential models\n" + \
+              "Message Gateway Simulator produces referential models\n" + \
               "for iterative training. This simulator provides a workbench to tweak models\n" + \
               "to meet preferred goals. The generates patterns that can be used to deploy\n" + \
               "on Message Gateway to validate accuracy of results.\n" + \
@@ -727,6 +641,40 @@ class PyAUIFrame(wx.Frame):
         self._mgr.Update()
 
 
+    def OnNavData(self, event):
+        self._mgr.AddPane(self.CreateTextCtrl(), aui.AuiPaneInfo().
+                          Caption("Text Control").
+                          Float().FloatingPosition(self.GetStartPosition()).
+                          CloseButton(True).MaximizeButton(True))
+
+        self._mgr.GetPane("grid_content").Show(event.GetId() == ID_GridContent)
+        self._mgr.GetPane("text_content").Show(event.GetId() == ID_TextContent)
+        self._mgr.GetPane("tree_content").Show(event.GetId() == ID_TreeContent)
+        self._mgr.GetPane("sizereport_content").Show(event.GetId() == ID_SizeReportContent)
+        self._mgr.GetPane("html_content").Show(event.GetId() == ID_HTMLContent)
+        self._mgr.Update()
+
+    def OnNavModel(self, event):
+        self._mgr.AddPane(self.CreateTextCtrl(), aui.AuiPaneInfo().
+                          Caption("Text Control").
+                          Float().FloatingPosition(self.GetStartPosition()).
+                          CloseButton(True).MaximizeButton(True))
+        self._mgr.Update()
+
+    def OnNavExpr(self, event):
+        self._mgr.AddPane(self.CreateTextCtrl(), aui.AuiPaneInfo().
+                          Caption("Text Control").
+                          Float().FloatingPosition(self.GetStartPosition()).
+                          CloseButton(True).MaximizeButton(True))
+        self._mgr.Update()
+
+    def OnNavResults(self, event):
+        self._mgr.AddPane(self.CreateTextCtrl(), aui.AuiPaneInfo().
+                          Caption("Text Control").
+                          Float().FloatingPosition(self.GetStartPosition()).
+                          CloseButton(True).MaximizeButton(True))
+        self._mgr.Update()
+
     def OnCreateSizeReport(self, event):
         self._mgr.AddPane(self.CreateSizeReportCtrl(), aui.AuiPaneInfo().
                           Caption("Client Size Reporter").
@@ -752,6 +700,13 @@ class PyAUIFrame(wx.Frame):
         return wx.TextCtrl(self,-1, text, wx.Point(0, 0), wx.Size(150, 90),
                            wx.NO_BORDER | wx.TE_MULTILINE)
 
+    def CreateStatusTextCtrl(self):
+
+        text = ("Welcome to Message Gateway Simulator!")
+
+        return wx.TextCtrl(self,-1, text, wx.Point(0, 0), wx.Size(150, 90),
+                           wx.TE_READONLY | wx.NO_BORDER | wx.TE_MULTILINE)
+
 
 
     def CreateGrid(self):
@@ -763,13 +718,45 @@ class PyAUIFrame(wx.Frame):
 
         return grid
 
-
     def CreateTreeCtrl(self):
 
         tree = wx.TreeCtrl(self, -1, wx.Point(0, 0), wx.Size(160, 250),
                            wx.TR_DEFAULT_STYLE | wx.NO_BORDER)
 
         root = tree.AddRoot("AUI Project")
+        items = []
+
+        imglist = wx.ImageList(16, 16, True, 2)
+        imglist.Add(wx.ArtProvider.GetBitmap(wx.ART_FOLDER, wx.ART_OTHER, wx.Size(16,16)))
+        imglist.Add(wx.ArtProvider.GetBitmap(wx.ART_NORMAL_FILE, wx.ART_OTHER, wx.Size(16,16)))
+        tree.AssignImageList(imglist)
+
+        items.append(tree.AppendItem(root, "Item 1", 0))
+        items.append(tree.AppendItem(root, "Item 2", 0))
+        items.append(tree.AppendItem(root, "Item 3", 0))
+        items.append(tree.AppendItem(root, "Item 4", 0))
+        items.append(tree.AppendItem(root, "Item 5", 0))
+
+        for ii in range(len(items)):
+
+            id = items[ii]
+            tree.AppendItem(id, "Subitem 1", 1)
+            tree.AppendItem(id, "Subitem 2", 1)
+            tree.AppendItem(id, "Subitem 3", 1)
+            tree.AppendItem(id, "Subitem 4", 1)
+            tree.AppendItem(id, "Subitem 5", 1)
+
+        tree.Expand(root)
+
+        return tree
+
+
+    def CreateDataTreeCtrl(self):
+
+        tree = wx.TreeCtrl(self, -1, wx.Point(0, 0), wx.Size(160, 250),
+                           wx.TR_DEFAULT_STYLE | wx.NO_BORDER)
+
+        root = tree.AddRoot("Data Tree Control")
         items = []
 
         imglist = wx.ImageList(16, 16, True, 2)
@@ -1195,7 +1182,7 @@ on Message Gateway to validate accuracy of results.</p>
 
 <ul>
 <li>Native, dockable floating frames</li>
-<li>wxPython to manage cross-platform window management.</li>
+<li>wxPython to manage cross-platform window management</li>
 <li>PostgreSQL server to manage internal system metadata</li>
 <li>TensorFlow for deep reinforcement learning</li>
 <li>wx.OGL for 2D graphic management</li>
@@ -1269,7 +1256,7 @@ class MainPanel(wx.Panel):
         wx.Panel.__init__(self, parent, -1)
 #        b = wx.Button(self, -1, "Show the aui Demo Frame", (50,50))
 #        self.Bind(wx.EVT_BUTTON, self.OnButton, b)
-        frame = PyAUIFrame(self, wx.ID_ANY, "Message Gateway Simulator", size=(750, 590))
+        frame = PyAUIFrame(self, wx.ID_ANY, "Message Gateway Simulator", size=(1024, 768))
         frame.Show()
 
 class RunWxApp(wx.App):
@@ -1284,43 +1271,15 @@ class RunWxApp(wx.App):
 
         self.SetAssertMode(assertMode)
 
-        frame = wx.Frame(None, -1, self.name, size=(0,0),
+        baseFrame = wx.Frame(None, -1, self.name, size=(0,0),
                          style=wx.DEFAULT_FRAME_STYLE, name=self.name)
-        #frame.CreateStatusBar()
-        #frame.Show()
+        baseFrame.Bind(wx.EVT_CLOSE, self.OnCloseFrame)
+        win = MainLayout(MainPanel(baseFrame, self.log))
 
-
-        menuBar = wx.MenuBar()
-        menu = wx.Menu()
-        item = menu.Append(-1, "&Load Model\tF6", "Load model into Simulator")
-        self.Bind(wx.EVT_MENU, self.OnLoadModel, item)
-        item = menu.Append(wx.ID_EXIT, "E&xit\tCtrl-Q", "Exit demo")
-        self.Bind(wx.EVT_MENU, self.OnExitApp, item)
-        menuBar.Append(menu, "&File")
-
-        ns = {}
-        ns['wx'] = wx
-        ns['app'] = self
-#        ns['module'] = self.demoModule
-
-#        frame.SetMenuBar(menuBar)
-#        frame.Show(True)
-        frame.Bind(wx.EVT_CLOSE, self.OnCloseFrame)
-        win = MainLayout(MainPanel(frame, self.log))
-
-        # a window will be returned if the demo does not create
-        # its own top-level window
-        if win:
-            # so set the frame to a good size for showing stuff
-            frame.SetSize((800, 600))
-            win.SetFocus()
-            self.window = win
-            ns['win'] = win
-            frect = frame.GetRect()
-
-
-        self.SetTopWindow(frame)
-        self.frame = frame
+        win.SetFocus()
+        self.window = win
+        self.SetTopWindow(baseFrame)
+        self.frame = baseFrame
         #wx.Log.SetActiveTarget(wx.LogStderr())
         #wx.Log.SetTraceMask(wx.TraceMessages)
         return True
@@ -1644,34 +1603,11 @@ def main(argv):
 #    setup_glut_draw()
     reshape(win_width, win_height)
     world.env.reshape(win_width, win_height)
-
     init_time()
 #    glutMainLoop()
-
     app.MainLoop()
 
-
-# ensure the CWD is the demo folder
-    #demoFolder = os.path.realpath(os.path.dirname(__file__))
-    #os.chdir(demoFolder)
-
-    #sys.path.insert(0, os.path.join(demoFolder, 'agw'))
-    #sys.path.insert(0, '.')
-
-    #name, ext  = os.path.splitext(argv[1])
-
-
-    #app = RunDemoApp(name, module, useShell)
-    #app.MainLoop()
-
     return
-
-
-#if __name__ == '__main__':
-#    import sys,os
-#    import run
-#    run.main(['', os.path.basename(sys.argv[0])] + sys.argv[1:])
-
 
 if __name__ == "__main__":
     main(sys.argv)
