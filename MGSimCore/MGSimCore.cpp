@@ -126,9 +126,9 @@ void cMGSimCore::MouseMove(int x, int y)
 void cMGSimCore::Reshape(int w, int h)
 {
 	mScene->Reshape(w, h);
-	mDefaultFrameBuffer->Reshape(w, h);
-	glViewport(0, 0, w, h);
-	glutPostRedisplay();
+//	mDefaultFrameBuffer->Reshape(w, h);
+//	glViewport(0, 0, w, h);
+//	glutPostRedisplay();
 }
 
 void cMGSimCore::Shutdown()

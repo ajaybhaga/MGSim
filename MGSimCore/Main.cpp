@@ -37,8 +37,7 @@ std::unique_ptr<cMGSimCore> gCore;
 
 void SetupMGSimCore()
 {
-	bool enable_draw = true;
-	gCore = std::unique_ptr<cMGSimCore>(new cMGSimCore(enable_draw));
+	gCore = std::unique_ptr<cMGSimCore>(new cMGSimCore(false));
 	gCore->ParseArgs(gArgs);
 	gCore->Init();
 
