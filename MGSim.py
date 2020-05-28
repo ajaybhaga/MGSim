@@ -142,6 +142,80 @@ import wx.lib.layoutf as layoutf
 
 #---------------------------------------------------------------------------
 
+class TestDialog(wx.Dialog):
+    def __init__(
+            self, parent, id, title, size=wx.DefaultSize, pos=wx.DefaultPosition,
+            style=wx.DEFAULT_DIALOG_STYLE, name='dialog'
+    ):
+
+        # Instead of calling wx.Dialog.__init__ we precreate the dialog
+        # so we can set an extra style that must be set before
+        # creation, and then we create the GUI object using the Create
+        # method.
+        wx.Dialog.__init__(self)
+        self.SetExtraStyle(wx.DIALOG_EX_CONTEXTHELP)
+        self.Create(parent, id, title, pos, size, style, name)
+
+        # Now continue with the normal construction of the dialog
+        # contents
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        label = wx.StaticText(self, -1, "This is a wx.Dialog")
+        label.SetHelpText("This is the help text for the label")
+        sizer.Add(label, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
+
+        box = wx.BoxSizer(wx.HORIZONTAL)
+
+        label = wx.StaticText(self, -1, "Field #1:")
+        label.SetHelpText("This is the help text for the label")
+        box.Add(label, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
+
+        text = wx.TextCtrl(self, -1, "", size=(80,-1))
+        text.SetHelpText("Here's some help text for field #1")
+        box.Add(text, 1, wx.ALIGN_CENTRE|wx.ALL, 5)
+
+        sizer.Add(box, 0, wx.EXPAND|wx.ALL, 5)
+
+        box = wx.BoxSizer(wx.HORIZONTAL)
+
+        label = wx.StaticText(self, -1, "Field #2:")
+        label.SetHelpText("This is the help text for the label")
+        box.Add(label, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
+
+        text = wx.TextCtrl(self, -1, "", size=(80,-1))
+        text.SetHelpText("Here's some help text for field #2")
+        box.Add(text, 1, wx.ALIGN_CENTRE|wx.ALL, 5)
+
+        sizer.Add(box, 0, wx.EXPAND|wx.ALL, 5)
+
+        line = wx.StaticLine(self, -1, size=(20,-1), style=wx.LI_HORIZONTAL)
+
+        sizer.Add(line, 0, wx.EXPAND|wx.RIGHT|wx.TOP, 5)
+
+        btnsizer = wx.StdDialogButtonSizer()
+
+        if wx.Platform != "__WXMSW__":
+            btn = wx.ContextHelpButton(self)
+            btnsizer.AddButton(btn)
+
+        btn = wx.Button(self, wx.ID_OK)
+        btn.SetHelpText("The OK button completes the dialog")
+        btn.SetDefault()
+        btnsizer.AddButton(btn)
+
+        btn = wx.Button(self, wx.ID_CANCEL)
+        btn.SetHelpText("The Cancel button cancels the dialog. (Cool, huh?)")
+        btnsizer.AddButton(btn)
+        btnsizer.Realize()
+
+        sizer.Add(btnsizer, 0, wx.ALL, 5)
+
+        self.SetSizer(sizer)
+        sizer.Fit(self)
+
+
+#---------------------------------------------------------------------------
+
 class PyAUIFrame(wx.Frame):
 
     def __init__(self, parent, id=-1, title="", pos=wx.DefaultPosition,
@@ -243,10 +317,23 @@ class PyAUIFrame(wx.Frame):
         tb3 = wx.ToolBar(self, -1, wx.DefaultPosition, wx.DefaultSize,
                          wx.TB_FLAT | wx.TB_HORZ_TEXT)
         tb3.SetToolBitmapSize(wx.Size(16,16))
+
         tb3.AddTool(101, "New Simulation", filenew_bmp1)
-        tb3.AddTool(101, "Load Model", fileopen_bmp1)
-        tb3.AddTool(101, "Save Model", filesave_bmp1)
-        tb3.AddTool(101, "Export Pattern", patternexp_bmp1)
+        self.Bind(wx.EVT_TOOL, self.OnToolClick, id=101)
+        self.Bind(wx.EVT_TOOL_RCLICKED, self.OnToolRClick, id=101)
+
+        tb3.AddTool(102, "Load Model", fileopen_bmp1)
+        self.Bind(wx.EVT_TOOL, self.OnToolClick, id=102)
+        self.Bind(wx.EVT_TOOL_RCLICKED, self.OnToolRClick, id=102)
+
+        tb3.AddTool(103, "Save Model", filesave_bmp1)
+        self.Bind(wx.EVT_TOOL, self.OnToolClick, id=103)
+        self.Bind(wx.EVT_TOOL_RCLICKED, self.OnToolRClick, id=103)
+
+        tb3.AddTool(104, "Export Pattern", patternexp_bmp1)
+        self.Bind(wx.EVT_TOOL, self.OnToolClick, id=104)
+        self.Bind(wx.EVT_TOOL_RCLICKED, self.OnToolRClick, id=104)
+
 #        tb3.AddSeparator()
 #        tb3.AddTool(101, "Test", tb3_bmp1)
 #        tb3.AddTool(101, "Test", tb3_bmp1)
@@ -256,10 +343,22 @@ class PyAUIFrame(wx.Frame):
         tb4 = wx.ToolBar(self, -1, wx.DefaultPosition, wx.DefaultSize,
                          wx.TB_FLAT | wx.TB_NODIVIDER | wx.TB_HORZ_TEXT | wx.TB_VERTICAL)
         tb4.SetToolBitmapSize(wx.Size(16,16))
-        tb4.AddTool(101, "Data", disk_bmp1)
-        tb4.AddTool(101, "Model", model_bmp1)
-        tb4.AddTool(101, "Experiment", expr_bmp1)
-        tb4.AddTool(101, "Results", result_bmp1)
+        tb4.AddTool(105, "Data", disk_bmp1)
+        self.Bind(wx.EVT_TOOL, self.OnToolClick, id=105)
+        self.Bind(wx.EVT_TOOL_RCLICKED, self.OnToolRClick, id=105)
+
+        tb4.AddTool(106, "Model", model_bmp1)
+        self.Bind(wx.EVT_TOOL, self.OnToolClick, id=106)
+        self.Bind(wx.EVT_TOOL_RCLICKED, self.OnToolRClick, id=106)
+
+        tb4.AddTool(107, "Experiment", expr_bmp1)
+        self.Bind(wx.EVT_TOOL, self.OnToolClick, id=107)
+        self.Bind(wx.EVT_TOOL_RCLICKED, self.OnToolRClick, id=107)
+
+        tb4.AddTool(108, "Results", result_bmp1)
+        self.Bind(wx.EVT_TOOL, self.OnToolClick, id=108)
+        self.Bind(wx.EVT_TOOL_RCLICKED, self.OnToolRClick, id=108)
+
         tb4.Realize()
 
         '''
@@ -401,6 +500,91 @@ class PyAUIFrame(wx.Frame):
         self.Bind(wx.EVT_MENU_RANGE, self.OnRestorePerspective,
                   id=ID_FirstPerspective[0], id2=ID_FirstPerspective[-1])
 
+
+
+
+
+    def OnTool101(self):
+        Logger.print('Tool 101');
+        dlg = TestDialog(self, -1, "New Simulation", size=(350, 200),
+                             style=wx.DEFAULT_DIALOG_STYLE)
+        dlg.ShowWindowModal()
+
+    def OnTool102(self):
+        Logger.print('Tool 102');
+        dlg = TestDialog(self, -1, "Load Model", size=(350, 200),
+                         style=wx.DEFAULT_DIALOG_STYLE)
+        dlg.ShowWindowModal()
+
+    def OnTool103(self):
+        Logger.print('Tool 103');
+        dlg = TestDialog(self, -1, "Save Model", size=(350, 200),
+                         style=wx.DEFAULT_DIALOG_STYLE)
+        dlg.ShowWindowModal()
+
+    def OnTool104(self):
+        Logger.print('Tool 104');
+        dlg = TestDialog(self, -1, "Export Pattern", size=(350, 200),
+                         style=wx.DEFAULT_DIALOG_STYLE)
+        dlg.ShowWindowModal()
+
+    def OnTool105(self):
+        Logger.print('Navigate Data');
+        # Update center content
+
+    def OnTool106(self):
+        Logger.print('Navigate Model');
+        # Update center content
+
+    def OnTool107(self):
+        Logger.print('Navigate Experiment');
+        # Update center content
+
+    def OnTool108(self):
+        Logger.print('Navigate Results');
+        # Update center content
+
+    def OnToolClick(self, event):
+        Logger.print("tool %s clicked\n" % event.GetId())
+        #tb = self.GetToolBar()
+        tb = event.GetEventObject()
+        #tb.EnableTool(10, not tb.GetToolEnabled(10))
+
+        # New Simulation
+        if (event.GetId() == 101):
+            self.OnTool101()
+
+        # Load Model
+        if (event.GetId() == 102):
+            self.OnTool102()
+
+        # Save Model
+        if (event.GetId() == 103):
+            self.OnTool103()
+
+        # Export Pattern
+        if (event.GetId() == 104):
+            self.OnTool104()
+
+        # Navigate Data
+        if (event.GetId() == 105):
+            self.OnTool105()
+
+        # Navigate Model
+        if (event.GetId() == 106):
+            self.OnTool106()
+
+        # Navigate Experiment
+        if (event.GetId() == 107):
+            self.OnTool107()
+
+        # Navigate Results
+        if (event.GetId() == 108):
+            self.OnTool108()
+
+
+    def OnToolRClick(self, event):
+        Logger.print("tool %s right-clicked\n" % event.GetId())
 
     def OnPaneClose(self, event):
 
