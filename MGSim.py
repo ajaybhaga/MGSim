@@ -16,6 +16,8 @@ to meet preferred goals.  The generates patterns that can be used to deploy
 on Message Gateway to validate accuracy of results.
 
 - wxPython to manage cross-platform window management
+- pandas for fundamental high-level building block of practical, real world data analysis
+- SQLAlchemy is the Python SQL toolkit and Object Relational Mapper that gives application developers the full power and flexibility of SQL
 - PostgreSQL server to manage internal system metadata
 - TensorFlow for deep reinforcement learning
 - wx.OGL for 2D graphic management
@@ -58,6 +60,10 @@ from util.arg_parser import ArgParser
 from util.logger import Logger
 import util.mpi_util as MPIUtil
 import util.util as Util
+
+import pandas as pd
+from sqlalchemy import create_engine
+
 
 ID_CreateTree = wx.NewIdRef()
 ID_CreateGrid = wx.NewIdRef()
@@ -126,6 +132,15 @@ world = None
 assertMode = wx.APP_ASSERT_DIALOG
 ##assertMode = wx.APP_ASSERT_EXCEPTION
 
+#---------------------------------------------------------------------------
+
+# This is how you pre-establish a file filter so that the dialog
+# only shows the extension(s) you want it to.
+wildcard = "Model file (*.mdl)|*.mdl|" \
+           "CSV (*.csv)|*.csv|" \
+           "Text file (*.txt)|*.txt|" \
+           "All files (*.*)|*.*"
+
 #----------------------------------------------------------------------------
 
 class Log:
@@ -139,8 +154,195 @@ class Log:
 import wx
 import wx.lib.layoutf as layoutf
 
-
 #---------------------------------------------------------------------------
+class SaveModelDialog(wx.Dialog):
+
+    def __init__(
+            self, parent, id, title, size=wx.DefaultSize, pos=wx.DefaultPosition,
+            style=wx.DEFAULT_DIALOG_STYLE, name='dialog'
+    ):
+
+        # Instead of calling wx.Dialog.__init__ we precreate the dialog
+        # so we can set an extra style that must be set before
+        # creation, and then we create the GUI object using the Create
+        # method.
+        wx.Dialog.__init__(self)
+        self.SetExtraStyle(wx.DIALOG_EX_CONTEXTHELP)
+        self.Create(parent, id, title, pos, size, style, name)
+
+        # Now continue with the normal construction of the dialog
+        # contents
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        label = wx.StaticText(self, -1, "Save Model")
+        label.SetHelpText("This will save the model.")
+        sizer.Add(label, 0, wx.ALIGN_LEFT|wx.ALL, 5)
+
+        box = wx.BoxSizer(wx.HORIZONTAL)
+
+        label = wx.StaticText(self, -1, "Model Name:")
+        label.SetHelpText("This is the model name.")
+        box.Add(label, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
+
+        self.modelNameText = wx.TextCtrl(self, -1, "", size=(80,-1))
+        self.modelNameText.SetHelpText("Model Name")
+        box.Add(self.modelNameText, 1, wx.ALIGN_CENTRE|wx.ALL, 5)
+
+        sizer.Add(box, 0, wx.EXPAND|wx.ALL, 5)
+
+        box = wx.BoxSizer(wx.HORIZONTAL)
+
+        label = wx.StaticText(self, -1, "Model File:")
+        label.SetHelpText("This is the model file.")
+        box.Add(label, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
+        self.modelFileText = wx.TextCtrl(self, -1, "", size=(80,-1))
+        self.modelFileText.SetHelpText("Model File")
+
+        btnId = wx.NewIdRef()
+        btn = wx.Button(self, btnId)
+        btn.SetLabelText("Select save model file")
+        btn.SetHelpText("Select save model file")
+        btn.SetDefault()
+        self.Bind(wx.EVT_BUTTON, self.OnChooseSaveModelFileButton, btn)
+
+        box.Add(self.modelFileText, 1, wx.ALIGN_CENTRE|wx.ALL, 5)
+        box.Add(btn, 1, wx.ALIGN_CENTRE|wx.ALL, 5)
+
+        sizer.Add(box, 0, wx.EXPAND|wx.ALL, 5)
+
+        line = wx.StaticLine(self, -1, size=(20,-1), style=wx.LI_HORIZONTAL)
+
+        sizer.Add(line, 0, wx.EXPAND|wx.RIGHT|wx.TOP, 5)
+
+        btnsizer = wx.StdDialogButtonSizer()
+
+        if wx.Platform != "__WXMSW__":
+            btn = wx.ContextHelpButton(self)
+            btnsizer.AddButton(btn)
+
+        btn = wx.Button(self, wx.ID_OK)
+        btn.SetHelpText("Confirm Save")
+        btn.SetDefault()
+        self.Bind(wx.EVT_BUTTON, self.OnSaveModelButton, btn)
+#        self.Bind(wx.EVT_TOOL, self.OnToolClick, id=101)
+#        self.Bind(wx.EVT_TOOL_RCLICKED, self.OnToolRClick, id=101)
+
+
+        btnsizer.AddButton(btn)
+
+        btn = wx.Button(self, wx.ID_CANCEL)
+        btn.SetHelpText("Cancel")
+        btnsizer.AddButton(btn)
+        btnsizer.Realize()
+
+        sizer.Add(btnsizer, 0, wx.ALL, 5)
+
+        self.SetSizer(sizer)
+        sizer.Fit(self)
+
+
+    def OnCreateOpenDialog(self):
+        Logger.print("CWD: %s\n" % os.getcwd())
+
+        # Create the dialog. In this case the current directory is forced as the starting
+        # directory for the dialog, and no default file name is forced. This can easilly
+        # be changed in your program. This is an 'open' dialog, and allows multitple
+        # file selections as well.
+        #
+        # Finally, if the directory is changed in the process of getting files, this
+        # dialog is set up to change the current working directory to the path chosen.
+        dlg = wx.FileDialog(
+            self, message="Choose a file",
+            defaultDir=os.getcwd(),
+            defaultFile="",
+            wildcard=wildcard,
+            style=wx.FD_OPEN | wx.FD_MULTIPLE |
+                  wx.FD_CHANGE_DIR | wx.FD_FILE_MUST_EXIST |
+                  wx.FD_PREVIEW
+        )
+
+        # Show the dialog and retrieve the user response. If it is the OK response,
+        # process the data.
+        if dlg.ShowModal() == wx.ID_OK:
+            # This returns a Python list of files that were selected.
+            paths = dlg.GetPaths()
+
+            self.log.WriteText('You selected %d files:' % len(paths))
+
+            for path in paths:
+                self.log.WriteText('           %s\n' % path)
+
+        # Compare this with the debug above; did we change working dirs?
+        Logger.print("CWD: %s\n" % os.getcwd())
+
+        # Destroy the dialog. Don't do this until you are done with it!
+        # BAD things can happen otherwise!
+        dlg.Destroy()
+
+    def OnCreateSaveDialog(self):
+        Logger.print("CWD: %s\n" % os.getcwd())
+
+        # Create the dialog. In this case the current directory is forced as the starting
+        # directory for the dialog, and no default file name is forced. This can easilly
+        # be changed in your program. This is an 'save' dialog.
+        #
+        # Unlike the 'open dialog' example found elsewhere, this example does NOT
+        # force the current working directory to change if the user chooses a different
+        # directory than the one initially set.
+        dlg = wx.FileDialog(
+            self, message="Save file as ...", defaultDir=os.getcwd(),
+            defaultFile="", wildcard=wildcard, style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
+        )
+
+        # This sets the default filter that the user will initially see. Otherwise,
+        # the first filter in the list will be used by default.
+        dlg.SetFilterIndex(2)
+
+        # Show the dialog and retrieve the user response. If it is the OK response,
+        # process the data.
+        if dlg.ShowModal() == wx.ID_OK:
+            path = dlg.GetPath()
+            Logger.print('You selected "%s"' % path)
+
+            # Normally, at this point you would save your data using the file and path
+            # data that the user provided to you, but since we didn't actually start
+            # with any data to work with, that would be difficult.
+            #
+            # The code to do so would be similar to this, assuming 'data' contains
+            # the data you want to save:
+            #
+            # fp = file(path, 'w') # Create file anew
+            # fp.write(data)
+            # fp.close()
+            #
+            # You might want to add some error checking :-)
+            #
+            self.modelFileText.SetValue(path)
+
+        # Note that the current working dir didn't change. This is good since
+        # that's the way we set it up.
+        Logger.print("CWD: %s\n" % os.getcwd())
+
+        # Destroy the dialog. Don't do this until you are done with it!
+        # BAD things can happen otherwise!
+        dlg.Destroy()
+
+    def OnChooseSaveModelFileButton(self, evt):
+        self.OnCreateSaveDialog()
+
+    def OnSaveModelButton(self, evt):
+        saveModelName = self.modelNameText.GetValue()
+        saveModelFile = self.modelFileText.GetValue()
+
+        Logger.print("Saving model %s" % saveModelName)
+
+        engine = create_engine('postgresql://master:munvo123@localhost:5432/mgsim')
+        #apr_csv_data = pd.read_csv(r'/home/my_linux_user/pg_py_database/apr_2019_hiking_stats.csv')
+        apr_csv_data = pd.read_csv(saveModelFile)
+        apr_csv_data.head()
+
+
+
 
 class TestDialog(wx.Dialog):
     def __init__(
@@ -518,7 +720,7 @@ class PyAUIFrame(wx.Frame):
 
     def OnTool103(self):
         Logger.print('Tool 103');
-        dlg = TestDialog(self, -1, "Save Model", size=(350, 200),
+        dlg = SaveModelDialog(self, -1, "Save Model", size=(350, 200),
                          style=wx.DEFAULT_DIALOG_STYLE)
         dlg.ShowWindowModal()
 
@@ -1367,6 +1569,8 @@ on Message Gateway to validate accuracy of results.</p>
 <ul>
 <li>Native, dockable floating frames</li>
 <li>wxPython to manage cross-platform window management</li>
+<li>pandas for fundamental high-level building block of practical, real world data analysis</li>
+<li>SQLAlchemy is the Python SQL toolkit and Object Relational Mapper that gives application developers the full power and flexibility of SQL</li>
 <li>PostgreSQL server to manage internal system metadata</li>
 <li>TensorFlow for deep reinforcement learning</li>
 <li>wx.OGL for 2D graphic management</li>
