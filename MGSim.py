@@ -36,6 +36,12 @@ import wx.html
 import wx.aui as aui
 import sys, os
 
+import wx
+import wx.adv
+from wx.adv import Wizard as wiz
+from wx.adv import WizardPage, WizardPageSimple
+import images
+
 from six import BytesIO
 
 try:
@@ -63,7 +69,9 @@ import util.util as Util
 
 import pandas as pd
 from sqlalchemy import create_engine
-
+import wx
+import wx.lib.layoutf as layoutf
+import wx.grid as gridlib
 
 ID_CreateTree = wx.NewIdRef()
 ID_CreateGrid = wx.NewIdRef()
@@ -150,9 +158,322 @@ class Log:
         wx.LogMessage(text)
     write = WriteText
 
+global log
+log = Log()
 
-import wx
-import wx.lib.layoutf as layoutf
+
+#----------------------------------------------------------------------
+
+def makePageTitle(wizPg, title):
+    sizer = wx.BoxSizer(wx.VERTICAL)
+    wizPg.SetSizer(sizer)
+    title = wx.StaticText(wizPg, -1, title)
+    title.SetFont(wx.Font(10, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+    sizer.Add(title, 0, wx.ALIGN_LEFT|wx.ALL, 5)
+    sizer.Add(wx.StaticLine(wizPg, -1), 0, wx.EXPAND|wx.ALL, 5)
+
+    box = wx.BoxSizer(wx.HORIZONTAL)
+    sizer.Add(box, 0, wx.EXPAND|wx.ALL, 5)
+    return sizer
+
+#----------------------------------------------------------------------
+
+class TitledPage(wx.adv.WizardPageSimple):
+    def __init__(self, parent, title):
+        WizardPageSimple.__init__(self, parent)
+        self.sizer = makePageTitle(self, title)
+
+
+
+#---------------------------------------------------------------------------
+
+class CustomDataTable(gridlib.GridTableBase):
+    def __init__(self, log):
+        gridlib.GridTableBase.__init__(self)
+        self.log = log
+
+        self.colLabels = ['ID', 'Description', 'Severity', 'Priority', 'Platform',
+                          'Opened?', 'Fixed?', 'Tested?', 'TestFloat']
+
+        self.dataTypes = [gridlib.GRID_VALUE_NUMBER,
+                          gridlib.GRID_VALUE_STRING,
+                          gridlib.GRID_VALUE_CHOICE + ':only in a million years!,wish list,minor,normal,major,critical',
+                          gridlib.GRID_VALUE_NUMBER + ':1,5',
+                          gridlib.GRID_VALUE_CHOICE + ':all,MSW,GTK,other',
+                          gridlib.GRID_VALUE_BOOL,
+                          gridlib.GRID_VALUE_BOOL,
+                          gridlib.GRID_VALUE_BOOL,
+                          gridlib.GRID_VALUE_FLOAT + ':6,2',
+                          ]
+
+        self.data = [
+            [1010, "The foo doesn't bar", "major", 1, 'MSW', 1, 1, 1, 1.12],
+            [1011, "I've got a wicket in my wocket", "wish list", 2, 'other', 0, 0, 0, 1.50],
+            [1012, "Rectangle() returns a triangle", "critical", 5, 'all', 0, 0, 0, 1.56]
+
+        ]
+
+
+    #--------------------------------------------------
+    # required methods for the wxPyGridTableBase interface
+
+    def GetNumberRows(self):
+        return len(self.data) + 1
+
+    def GetNumberCols(self):
+        return len(self.data[0])
+
+    def IsEmptyCell(self, row, col):
+        try:
+            return not self.data[row][col]
+        except IndexError:
+            return True
+
+    # Get/Set values in the table.  The Python version of these
+    # methods can handle any data-type, (as long as the Editor and
+    # Renderer understands the type too,) not just strings as in the
+    # C++ version.
+    def GetValue(self, row, col):
+        try:
+            return self.data[row][col]
+        except IndexError:
+            return ''
+
+    def SetValue(self, row, col, value):
+        def innerSetValue(row, col, value):
+            try:
+                self.data[row][col] = value
+            except IndexError:
+                # add a new row
+                self.data.append([''] * self.GetNumberCols())
+                innerSetValue(row, col, value)
+
+                # tell the grid we've added a row
+                msg = gridlib.GridTableMessage(self,            # The table
+                                               gridlib.GRIDTABLE_NOTIFY_ROWS_APPENDED, # what we did to it
+                                               1                                       # how many
+                                               )
+
+                self.GetView().ProcessTableMessage(msg)
+        innerSetValue(row, col, value)
+
+    #--------------------------------------------------
+    # Some optional methods
+
+    # Called when the grid needs to display labels
+    def GetColLabelValue(self, col):
+        return self.colLabels[col]
+
+    # Called to determine the kind of editor/renderer to use by
+    # default, doesn't necessarily have to be the same type used
+    # natively by the editor/renderer if they know how to convert.
+    def GetTypeName(self, row, col):
+        return self.dataTypes[col]
+
+    # Called to determine how the data can be fetched and stored by the
+    # editor and renderer.  This allows you to enforce some type-safety
+    # in the grid.
+    def CanGetValueAs(self, row, col, typeName):
+        colType = self.dataTypes[col].split(':')[0]
+        if typeName == colType:
+            return True
+        else:
+            return False
+
+    def CanSetValueAs(self, row, col, typeName):
+        return self.CanGetValueAs(row, col, typeName)
+
+
+#---------------------------------------------------------------------------
+
+
+class CustTableGrid(gridlib.Grid):
+    def __init__(self, parent, log):
+        gridlib.Grid.__init__(self, parent, -1)
+
+        table = CustomDataTable(log)
+
+        # The second parameter means that the grid is to take ownership of the
+        # table and will destroy it when done.  Otherwise you would need to keep
+        # a reference to it and call it's Destroy method later.
+        self.SetTable(table, True)
+
+        self.SetRowLabelSize(0)
+        self.SetMargins(0,0)
+        self.AutoSizeColumns(False)
+
+        self.Bind(gridlib.EVT_GRID_CELL_LEFT_DCLICK, self.OnLeftDClick)
+
+
+    # I do this because I don't like the default behaviour of not starting the
+    # cell editor on double clicks, but only a second click.
+    def OnLeftDClick(self, evt):
+        if self.CanEnableCellControl():
+            self.EnableCellEditControl()
+
+
+#---------------------------------------------------------------------------
+
+
+
+class ModelDataTable(gridlib.GridTableBase):
+    def __init__(self, log):
+        gridlib.GridTableBase.__init__(self)
+        self.log = log
+
+        self.colLabels = ['ID', 'Attribute Name', 'Data Type', 'Description', 'Import?']
+
+        self.dataTypes = [gridlib.GRID_VALUE_NUMBER,
+                          gridlib.GRID_VALUE_STRING,
+                          gridlib.GRID_VALUE_CHOICE + ':numeric,string,float,boolean',
+                          gridlib.GRID_VALUE_STRING,
+                          gridlib.GRID_VALUE_BOOL,
+                          ]
+
+        self.data = [
+            [1010, "Demo Attribute 1", "numeric", '', 1],
+            [1011, "Demo Attribute 2", "string", '', 1]
+
+#            [1010, "Demo Attribute 1", "numeric", '', 1]
+#            [1011, "I've got a wicket in my wocket", "wish list", 2, 'other', 0, 0, 0, 1.50],
+ #           [1012, "Rectangle() returns a triangle", "critical", 5, 'all', 0, 0, 0, 1.56]
+
+        ]
+
+    #--------------------------------------------------
+    # required methods for the wxPyGridTableBase interface
+
+    def GetNumberRows(self):
+        return len(self.data) + 1
+
+    def GetNumberCols(self):
+        return len(self.data[0])
+
+    def IsEmptyCell(self, row, col):
+        try:
+            return not self.data[row][col]
+        except IndexError:
+            return True
+
+    # Get/Set values in the table.  The Python version of these
+    # methods can handle any data-type, (as long as the Editor and
+    # Renderer understands the type too,) not just strings as in the
+    # C++ version.
+    def GetValue(self, row, col):
+        try:
+            return self.data[row][col]
+        except IndexError:
+            return ''
+
+    def SetData(self, data):
+        self.data = data
+
+    def SetValue(self, row, col, value):
+        def innerSetValue(row, col, value):
+            try:
+                self.data[row][col] = value
+            except IndexError:
+                # add a new row
+                self.data.append([''] * self.GetNumberCols())
+                innerSetValue(row, col, value)
+
+                # tell the grid we've added a row
+                msg = gridlib.GridTableMessage(self,            # The table
+                                               gridlib.GRIDTABLE_NOTIFY_ROWS_APPENDED, # what we did to it
+                                               1                                       # how many
+                                               )
+
+                self.GetView().ProcessTableMessage(msg)
+        innerSetValue(row, col, value)
+
+    #--------------------------------------------------
+    # Some optional methods
+
+    # Called when the grid needs to display labels
+    def GetColLabelValue(self, col):
+        return self.colLabels[col]
+
+    # Called to determine the kind of editor/renderer to use by
+    # default, doesn't necessarily have to be the same type used
+    # natively by the editor/renderer if they know how to convert.
+    def GetTypeName(self, row, col):
+        return self.dataTypes[col]
+
+    # Called to determine how the data can be fetched and stored by the
+    # editor and renderer.  This allows you to enforce some type-safety
+    # in the grid.
+    def CanGetValueAs(self, row, col, typeName):
+        colType = self.dataTypes[col].split(':')[0]
+        if typeName == colType:
+            return True
+        else:
+            return False
+
+    def CanSetValueAs(self, row, col, typeName):
+        return self.CanGetValueAs(row, col, typeName)
+
+
+#---------------------------------------------------------------------------
+
+
+#---------------------------------------------------------------------------
+
+
+class ImportModelTableGrid(gridlib.Grid):
+    def __init__(self, parent, log, paths):
+        gridlib.Grid.__init__(self, parent, -1)
+
+        self.table = ModelDataTable(log)
+        # Read paths file
+
+        for path in paths:
+            #engine = create_engine('postgresql://master:munvo123@localhost:5432/mgsim')
+            apr_csv_data = pd.read_csv(path)
+            Logger.print('Read model file %s' % path)
+            headers = apr_csv_data.head(1)
+            Logger.print(headers)
+
+            rowNum = 1
+            attrId = 1
+            attrIdOffset = 0
+            data = []
+            for header in headers:
+                Logger.print('Model file header[%d]: %s' % (rowNum, header))
+                # Set table to data set
+                attrName = header
+                attrType = "unknown"
+                attrDesc = ""
+                doImport = 1
+
+                data.append([attrId, attrName, attrType, attrDesc, doImport])
+                self.table.SetData(data)
+
+                rowNum = rowNum + 1
+                attrId = attrIdOffset + rowNum
+
+        # The second parameter means that the grid is to take ownership of the
+        # table and will destroy it when done.  Otherwise you would need to keep
+        # a reference to it and call it's Destroy method later.
+        self.SetTable(self.table, True)
+
+        self.SetRowLabelSize(0)
+        self.SetMargins(0,0)
+        self.AutoSizeColumns(False)
+
+        self.Bind(gridlib.EVT_GRID_CELL_LEFT_DCLICK, self.OnLeftDClick)
+
+    def getTable(self):
+        return self.table
+
+    # I do this because I don't like the default behaviour of not starting the
+    # cell editor on double clicks, but only a second click.
+    def OnLeftDClick(self, evt):
+        if self.CanEnableCellControl():
+            self.EnableCellEditControl()
+
+
+#---------------------------------------------------------------------------
+
 
 #---------------------------------------------------------------------------
 class SaveModelDialog(wx.Dialog):
@@ -182,11 +503,11 @@ class SaveModelDialog(wx.Dialog):
 
         label = wx.StaticText(self, -1, "Model Name:")
         label.SetHelpText("This is the model name.")
-        box.Add(label, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
+        box.Add(label, 0, wx.ALIGN_LEFT|wx.ALL, 5)
 
         self.modelNameText = wx.TextCtrl(self, -1, "", size=(80,-1))
         self.modelNameText.SetHelpText("Model Name")
-        box.Add(self.modelNameText, 1, wx.ALIGN_CENTRE|wx.ALL, 5)
+        box.Add(self.modelNameText, 1, wx.ALIGN_LEFT|wx.ALL, 5)
 
         sizer.Add(box, 0, wx.EXPAND|wx.ALL, 5)
 
@@ -194,19 +515,19 @@ class SaveModelDialog(wx.Dialog):
 
         label = wx.StaticText(self, -1, "Model File:")
         label.SetHelpText("This is the model file.")
-        box.Add(label, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
+        box.Add(label, 0, wx.ALIGN_LEFT|wx.ALL, 5)
         self.modelFileText = wx.TextCtrl(self, -1, "", size=(80,-1))
         self.modelFileText.SetHelpText("Model File")
 
         btnId = wx.NewIdRef()
         btn = wx.Button(self, btnId)
-        btn.SetLabelText("Select save model file")
+        btn.SetLabelText("Choose")
         btn.SetHelpText("Select save model file")
         btn.SetDefault()
         self.Bind(wx.EVT_BUTTON, self.OnChooseSaveModelFileButton, btn)
 
-        box.Add(self.modelFileText, 1, wx.ALIGN_CENTRE|wx.ALL, 5)
-        box.Add(btn, 1, wx.ALIGN_CENTRE|wx.ALL, 5)
+        box.Add(self.modelFileText, 1, wx.ALIGN_LEFT|wx.ALL, 5)
+        box.Add(btn, 1, wx.ALIGN_LEFT|wx.ALL, 5)
 
         sizer.Add(box, 0, wx.EXPAND|wx.ALL, 5)
 
@@ -239,45 +560,6 @@ class SaveModelDialog(wx.Dialog):
 
         self.SetSizer(sizer)
         sizer.Fit(self)
-
-
-    def OnCreateOpenDialog(self):
-        Logger.print("CWD: %s\n" % os.getcwd())
-
-        # Create the dialog. In this case the current directory is forced as the starting
-        # directory for the dialog, and no default file name is forced. This can easilly
-        # be changed in your program. This is an 'open' dialog, and allows multitple
-        # file selections as well.
-        #
-        # Finally, if the directory is changed in the process of getting files, this
-        # dialog is set up to change the current working directory to the path chosen.
-        dlg = wx.FileDialog(
-            self, message="Choose a file",
-            defaultDir=os.getcwd(),
-            defaultFile="",
-            wildcard=wildcard,
-            style=wx.FD_OPEN | wx.FD_MULTIPLE |
-                  wx.FD_CHANGE_DIR | wx.FD_FILE_MUST_EXIST |
-                  wx.FD_PREVIEW
-        )
-
-        # Show the dialog and retrieve the user response. If it is the OK response,
-        # process the data.
-        if dlg.ShowModal() == wx.ID_OK:
-            # This returns a Python list of files that were selected.
-            paths = dlg.GetPaths()
-
-            self.log.WriteText('You selected %d files:' % len(paths))
-
-            for path in paths:
-                self.log.WriteText('           %s\n' % path)
-
-        # Compare this with the debug above; did we change working dirs?
-        Logger.print("CWD: %s\n" % os.getcwd())
-
-        # Destroy the dialog. Don't do this until you are done with it!
-        # BAD things can happen otherwise!
-        dlg.Destroy()
 
     def OnCreateSaveDialog(self):
         Logger.print("CWD: %s\n" % os.getcwd())
@@ -342,6 +624,190 @@ class SaveModelDialog(wx.Dialog):
         apr_csv_data.head()
 
 
+
+#---------------------------------------------------------------------------
+class LoadModelDialog(wx.Dialog):
+
+    def __init__(
+            self, parent, id, title, size=wx.DefaultSize, pos=wx.DefaultPosition,
+            style=wx.DEFAULT_DIALOG_STYLE, name='dialog'
+    ):
+
+        # Instead of calling wx.Dialog.__init__ we precreate the dialog
+        # so we can set an extra style that must be set before
+        # creation, and then we create the GUI object using the Create
+        # method.
+        wx.Dialog.__init__(self)
+        self.SetExtraStyle(wx.DIALOG_EX_CONTEXTHELP)
+        self.Create(parent, id, title, pos, size, style, name)
+
+        # Now continue with the normal construction of the dialog
+        # contents
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        label = wx.StaticText(self, -1, "Load Model")
+        label.SetHelpText("This will load the model.")
+        sizer.Add(label, 0, wx.ALIGN_LEFT|wx.ALL, 5)
+        '''
+        box = wx.BoxSizer(wx.HORIZONTAL)
+
+        label = wx.StaticText(self, -1, "Model Name:")
+        label.SetHelpText("This is the model name.")
+        box.Add(label, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
+
+        self.modelNameText = wx.TextCtrl(self, -1, "", size=(80,-1))
+        self.modelNameText.SetHelpText("Model Name")
+        box.Add(self.modelNameText, 1, wx.ALIGN_CENTRE|wx.ALL, 5)
+
+        sizer.Add(box, 0, wx.EXPAND|wx.ALL, 5)
+        '''
+        box = wx.BoxSizer(wx.HORIZONTAL)
+
+        label = wx.StaticText(self, -1, "Model File:")
+        label.SetHelpText("This is the model file.")
+        box.Add(label, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
+        self.modelFileText = wx.TextCtrl(self, -1, "No model file.", wx.Point(0, 0), wx.Size(120, -1), wx.TE_READONLY | wx.NO_BORDER)
+        self.modelFileText.SetHelpText("Model File")
+
+
+        btnId = wx.NewIdRef()
+        btn = wx.Button(self, btnId)
+        btn.SetLabelText("Choose")
+        btn.SetHelpText("Select load model file")
+        btn.SetDefault()
+        self.Bind(wx.EVT_BUTTON, self.OnChooseLoadModelFileButton, btn)
+
+        box.Add(self.modelFileText, 1, wx.ALIGN_CENTRE|wx.ALL, 5)
+        box.Add(btn, 1, wx.ALIGN_CENTRE|wx.ALL, 5)
+
+        sizer.Add(box, 0, wx.EXPAND|wx.ALL, 5)
+
+        line = wx.StaticLine(self, -1, size=(20,-1), style=wx.LI_HORIZONTAL)
+
+        sizer.Add(line, 0, wx.EXPAND|wx.RIGHT|wx.TOP, 5)
+
+        btnsizer = wx.StdDialogButtonSizer()
+
+        if wx.Platform != "__WXMSW__":
+            btn = wx.ContextHelpButton(self)
+            btnsizer.AddButton(btn)
+
+        btn = wx.Button(self, wx.ID_OK)
+        btn.SetHelpText("Confirm Load")
+        btn.SetDefault()
+        self.Bind(wx.EVT_BUTTON, self.OnLoadModelButton, btn)
+        #        self.Bind(wx.EVT_TOOL, self.OnToolClick, id=101)
+        #        self.Bind(wx.EVT_TOOL_RCLICKED, self.OnToolRClick, id=101)
+
+
+        btnsizer.AddButton(btn)
+
+        btn = wx.Button(self, wx.ID_CANCEL)
+        btn.SetHelpText("Cancel")
+        btnsizer.AddButton(btn)
+        btnsizer.Realize()
+
+        sizer.Add(btnsizer, 0, wx.ALL, 5)
+
+        self.SetSizer(sizer)
+        sizer.Fit(self)
+
+
+    def OnCreateOpenDialog(self):
+        Logger.print("CWD: %s\n" % os.getcwd())
+
+        # Create the dialog. In this case the current directory is forced as the starting
+        # directory for the dialog, and no default file name is forced. This can easilly
+        # be changed in your program. This is an 'open' dialog, and allows multitple
+        # file selections as well.
+        #
+        # Finally, if the directory is changed in the process of getting files, this
+        # dialog is set up to change the current working directory to the path chosen.
+        dlg = wx.FileDialog(
+            self, message="Choose a file",
+            defaultDir=os.getcwd(),
+            defaultFile="",
+            wildcard=wildcard,
+            style=wx.FD_OPEN | wx.FD_MULTIPLE |
+                  wx.FD_CHANGE_DIR | wx.FD_FILE_MUST_EXIST |
+                  wx.FD_PREVIEW
+        )
+
+        # Show the dialog and retrieve the user response. If it is the OK response,
+        # process the data.
+        if dlg.ShowModal() == wx.ID_OK:
+            # This returns a Python list of files that were selected.
+            paths = dlg.GetPaths()
+
+            Logger.print('You selected %d files:' % len(paths))
+
+            for path in paths:
+                Logger.print('           %s\n' % path)
+
+            # Call our wizard
+            self.OnRunLoadModelWizard(paths)
+
+        # Compare this with the debug above; did we change working dirs?
+        Logger.print("CWD: %s\n" % os.getcwd())
+
+        # Destroy the dialog. Don't do this until you are done with it!
+        # BAD things can happen otherwise!
+        dlg.Destroy()
+
+    def OnRunLoadModelWizard(self, paths):
+
+        # Create the wizard and the pages
+        wizard = wiz(self, -1, "Load Model Wizard")
+        page1 = TitledPage(wizard, "Step 1: Verify data header")
+        page2 = TitledPage(wizard, "Step 2: Data access")
+        page3 = TitledPage(wizard, "Step 3: Data storage location")
+        page4 = TitledPage(wizard, "Step 4: Timing")
+        self.page1 = page1
+
+        # Page 1 (Step 1: Verify data header)
+        grid = ImportModelTableGrid(page1, log, paths)
+        page1.sizer.Add(grid, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
+
+        page2.sizer.Add(wx.StaticText(page2, -1, """
+        Step 2: Validate allowable data
+        """))
+
+        page3.sizer.Add(wx.StaticText(page3, -1, """        
+        Step 3: Set data storage location
+        """))
+
+        page4.sizer.Add(wx.StaticText(page4, -1, """
+        Step 4: When can data be loaded?
+        """))
+
+#        wizard.FitToPage(page1)
+        #wizard.SetMinSize(wx.Size(800, 600))
+
+        # Use the convenience Chain function to connect the pages
+        WizardPageSimple.Chain(page1, page2)
+        WizardPageSimple.Chain(page2, page3)
+        WizardPageSimple.Chain(page3, page4)
+
+        wizard.GetPageAreaSizer().Add(page1)
+        if wizard.RunWizard(page1):
+            wx.MessageBox("Wizard completed successfully", "Load Model complete.")
+        else:
+            wx.MessageBox("Wizard was cancelled", "Load Model incomplete!")
+
+
+    def OnChooseLoadModelFileButton(self, evt):
+        self.OnCreateOpenDialog()
+
+    def OnLoadModelButton(self, evt):
+        loadModelName = self.modelNameText.GetValue()
+        loadModelFile = self.modelFileText.GetValue()
+
+        Logger.print("Load model %s" % loadModelName)
+
+        engine = create_engine('postgresql://master:munvo123@localhost:5432/mgsim')
+        #apr_csv_data = pd.read_csv(r'/home/my_linux_user/pg_py_database/apr_2019_hiking_stats.csv')
+        apr_csv_data = pd.read_csv(loadModelFile)
+        apr_csv_data.head()
 
 
 class TestDialog(wx.Dialog):
@@ -714,7 +1180,7 @@ class PyAUIFrame(wx.Frame):
 
     def OnTool102(self):
         Logger.print('Tool 102');
-        dlg = TestDialog(self, -1, "Load Model", size=(350, 200),
+        dlg = LoadModelDialog(self, -1, "Load Model", size=(350, 200),
                          style=wx.DEFAULT_DIALOG_STYLE)
         dlg.ShowWindowModal()
 
@@ -1650,7 +2116,6 @@ class MainPanel(wx.Panel):
 class RunWxApp(wx.App):
     def __init__(self, name):
         self.name = name
-        self.log = Log()
         wx.App.__init__(self, redirect=False)
 
 
@@ -1662,7 +2127,7 @@ class RunWxApp(wx.App):
         baseFrame = wx.Frame(None, -1, self.name, size=(0,0),
                          style=wx.DEFAULT_FRAME_STYLE, name=self.name)
         baseFrame.Bind(wx.EVT_CLOSE, self.OnCloseFrame)
-        win = MainLayout(MainPanel(baseFrame, self.log))
+        win = MainLayout(MainPanel(baseFrame, log))
 
         win.SetFocus()
         self.window = win
