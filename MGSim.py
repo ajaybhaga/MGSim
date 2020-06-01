@@ -168,7 +168,7 @@ def makePageTitle(wizPg, title):
     sizer = wx.BoxSizer(wx.VERTICAL)
     wizPg.SetSizer(sizer)
     title = wx.StaticText(wizPg, -1, title)
-    title.SetFont(wx.Font(10, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+    title.SetFont(wx.Font(8, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
     sizer.Add(title, 0, wx.ALIGN_LEFT|wx.ALL, 5)
     sizer.Add(wx.StaticLine(wizPg, -1), 0, wx.EXPAND|wx.ALL, 5)
 
@@ -316,7 +316,7 @@ class CustTableGrid(gridlib.Grid):
 
 
 
-class ModelDataTable(gridlib.GridTableBase):
+class ModelImportDataTable(gridlib.GridTableBase):
     def __init__(self, log):
         gridlib.GridTableBase.__init__(self)
         self.log = log
@@ -415,6 +415,97 @@ class ModelDataTable(gridlib.GridTableBase):
 
 #---------------------------------------------------------------------------
 
+class ModelDataAccessTable(gridlib.GridTableBase):
+    def __init__(self, log):
+        gridlib.GridTableBase.__init__(self)
+        self.log = log
+
+        self.colLabels = ['ID', 'Attribute Name', 'User', 'Role', 'Read Access', 'Secure Store']
+
+        self.dataTypes = [gridlib.GRID_VALUE_NUMBER,
+                          gridlib.GRID_VALUE_STRING,
+                          gridlib.GRID_VALUE_CHOICE + ':user A',
+                          #+ ':numeric,string,float,boolean',
+                          gridlib.GRID_VALUE_CHOICE + ':admin,power user,user',
+                          gridlib.GRID_VALUE_BOOL,
+                          gridlib.GRID_VALUE_BOOL
+                          ]
+
+        self.data = []
+
+    #--------------------------------------------------
+    # required methods for the wxPyGridTableBase interface
+
+    def GetNumberRows(self):
+        return len(self.data) + 1
+
+    def GetNumberCols(self):
+        return len(self.data[0])
+
+    def IsEmptyCell(self, row, col):
+        try:
+            return not self.data[row][col]
+        except IndexError:
+            return True
+
+    # Get/Set values in the table.  The Python version of these
+    # methods can handle any data-type, (as long as the Editor and
+    # Renderer understands the type too,) not just strings as in the
+    # C++ version.
+    def GetValue(self, row, col):
+        try:
+            return self.data[row][col]
+        except IndexError:
+            return ''
+
+    def SetData(self, data):
+        self.data = data
+
+    def SetValue(self, row, col, value):
+        def innerSetValue(row, col, value):
+            try:
+                self.data[row][col] = value
+            except IndexError:
+                # add a new row
+                self.data.append([''] * self.GetNumberCols())
+                innerSetValue(row, col, value)
+
+                # tell the grid we've added a row
+                msg = gridlib.GridTableMessage(self,            # The table
+                                               gridlib.GRIDTABLE_NOTIFY_ROWS_APPENDED, # what we did to it
+                                               1                                       # how many
+                                               )
+
+                self.GetView().ProcessTableMessage(msg)
+        innerSetValue(row, col, value)
+
+    #--------------------------------------------------
+    # Some optional methods
+
+    # Called when the grid needs to display labels
+    def GetColLabelValue(self, col):
+        return self.colLabels[col]
+
+    # Called to determine the kind of editor/renderer to use by
+    # default, doesn't necessarily have to be the same type used
+    # natively by the editor/renderer if they know how to convert.
+    def GetTypeName(self, row, col):
+        return self.dataTypes[col]
+
+    # Called to determine how the data can be fetched and stored by the
+    # editor and renderer.  This allows you to enforce some type-safety
+    # in the grid.
+    def CanGetValueAs(self, row, col, typeName):
+        colType = self.dataTypes[col].split(':')[0]
+        if typeName == colType:
+            return True
+        else:
+            return False
+
+    def CanSetValueAs(self, row, col, typeName):
+        return self.CanGetValueAs(row, col, typeName)
+
+#---------------------------------------------------------------------------
 
 #---------------------------------------------------------------------------
 
@@ -423,9 +514,22 @@ class ImportModelTableGrid(gridlib.Grid):
     def __init__(self, parent, log, paths):
         gridlib.Grid.__init__(self, parent, -1)
 
-        self.table = ModelDataTable(log)
+        self.table = ModelImportDataTable(log)
         # Read paths file
+        self.load(paths)
 
+        # The second parameter means that the grid is to take ownership of the
+        # table and will destroy it when done.  Otherwise you would need to keep
+        # a reference to it and call it's Destroy method later.
+        self.SetTable(self.table, True)
+
+        self.SetRowLabelSize(0)
+        self.SetMargins(0,0)
+        self.AutoSizeColumns(False)
+
+        self.Bind(gridlib.EVT_GRID_CELL_LEFT_DCLICK, self.OnLeftDClick)
+
+    def load(self, paths):
         for path in paths:
             #engine = create_engine('postgresql://master:munvo123@localhost:5432/mgsim')
             apr_csv_data = pd.read_csv(path)
@@ -441,7 +545,7 @@ class ImportModelTableGrid(gridlib.Grid):
                 Logger.print('Model file header[%d]: %s' % (rowNum, header))
                 # Set table to data set
                 attrName = header
-                attrType = "unknown"
+                attrType = "string"
                 attrDesc = ""
                 doImport = 1
 
@@ -450,6 +554,26 @@ class ImportModelTableGrid(gridlib.Grid):
 
                 rowNum = rowNum + 1
                 attrId = attrIdOffset + rowNum
+
+    def getTable(self):
+        return self.table
+
+    # I do this because I don't like the default behaviour of not starting the
+    # cell editor on double clicks, but only a second click.
+    def OnLeftDClick(self, evt):
+        if self.CanEnableCellControl():
+            self.EnableCellEditControl()
+
+#---------------------------------------------------------------------------
+
+class ImportDataAccessTableGrid(gridlib.Grid):
+    def __init__(self, parent, log, imports):
+        gridlib.Grid.__init__(self, parent, -1)
+
+        self.table = ModelDataAccessTable(log)
+        self.data = []
+        # Read paths file
+        self.load(imports)
 
         # The second parameter means that the grid is to take ownership of the
         # table and will destroy it when done.  Otherwise you would need to keep
@@ -462,8 +586,36 @@ class ImportModelTableGrid(gridlib.Grid):
 
         self.Bind(gridlib.EVT_GRID_CELL_LEFT_DCLICK, self.OnLeftDClick)
 
+    def load(self, imports):
+        rowNum = 1
+        attrId = 1
+        attrIdOffset = 0
+        self.data = []
+        for dataField in imports:
+            Logger.print(dataField)
+#            Logger.print('Model file header[%d]: %s' % (rowNum, header))
+            # Set table to data set
+            attrName = dataField
+            user = "user A" # TODO: Integrate with real user system
+            role = "admin" # TODO: Integrate with real role system
+            doImport = 1
+            doSecureStore = 1
+
+            self.data.append([attrId, attrName, user, role, doImport, doSecureStore])
+            self.table.SetData(self.data)
+
+            rowNum = rowNum + 1
+            attrId = attrIdOffset + rowNum
+
+
     def getTable(self):
         return self.table
+
+#    def updateDataImports(grid):
+        #global modelGrid
+        #global dataAccessGrid
+        # Check model grid table for import field
+
 
     # I do this because I don't like the default behaviour of not starting the
     # cell editor on double clicks, but only a second click.
@@ -626,6 +778,10 @@ class SaveModelDialog(wx.Dialog):
 
 
 #---------------------------------------------------------------------------
+global modelGrid
+global dataAccessGrid
+
+
 class LoadModelDialog(wx.Dialog):
 
     def __init__(
@@ -765,23 +921,23 @@ class LoadModelDialog(wx.Dialog):
         self.page1 = page1
 
         # Page 1 (Step 1: Verify data header)
-        grid = ImportModelTableGrid(page1, log, paths)
-        page1.sizer.Add(grid, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
+        modelGrid = ImportModelTableGrid(page1, log, paths)
+        page1.sizer.Add(modelGrid, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
 
-        page2.sizer.Add(wx.StaticText(page2, -1, """
-        Step 2: Validate allowable data
-        """))
+        # Page 2 (Step 2: Set accessible data)
+        dataAccessGrid = ImportDataAccessTableGrid(page2, log, paths)
+        page2.sizer.Add(dataAccessGrid, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
 
         page3.sizer.Add(wx.StaticText(page3, -1, """        
-        Step 3: Set data storage location
+        Step 3: Set secure storage location
         """))
 
         page4.sizer.Add(wx.StaticText(page4, -1, """
         Step 4: When can data be loaded?
         """))
 
-#        wizard.FitToPage(page1)
-        #wizard.SetMinSize(wx.Size(800, 600))
+        wizard.FitToPage(page2)
+#        wizard.SetMinSize(wx.Size(1024, 600))
 
         # Use the convenience Chain function to connect the pages
         WizardPageSimple.Chain(page1, page2)
