@@ -73,6 +73,12 @@ import wx
 import wx.lib.layoutf as layoutf
 import wx.grid as gridlib
 
+import wx.adv
+from wx.adv import Wizard as wiz
+from wx.adv import WizardPage, WizardPageSimple
+
+
+
 ID_CreateTree = wx.NewIdRef()
 ID_CreateGrid = wx.NewIdRef()
 ID_CreateText = wx.NewIdRef()
@@ -180,141 +186,16 @@ def makePageTitle(wizPg, title):
 
 class TitledPage(wx.adv.WizardPageSimple):
     def __init__(self, parent, title):
+        self.title = title
         WizardPageSimple.__init__(self, parent)
         self.sizer = makePageTitle(self, title)
 
+    def setId(self, id):
+        self.id = id
 
-
+    def getId(self):
+        return self.id
 #---------------------------------------------------------------------------
-
-class CustomDataTable(gridlib.GridTableBase):
-    def __init__(self, log):
-        gridlib.GridTableBase.__init__(self)
-        self.log = log
-
-        self.colLabels = ['ID', 'Description', 'Severity', 'Priority', 'Platform',
-                          'Opened?', 'Fixed?', 'Tested?', 'TestFloat']
-
-        self.dataTypes = [gridlib.GRID_VALUE_NUMBER,
-                          gridlib.GRID_VALUE_STRING,
-                          gridlib.GRID_VALUE_CHOICE + ':only in a million years!,wish list,minor,normal,major,critical',
-                          gridlib.GRID_VALUE_NUMBER + ':1,5',
-                          gridlib.GRID_VALUE_CHOICE + ':all,MSW,GTK,other',
-                          gridlib.GRID_VALUE_BOOL,
-                          gridlib.GRID_VALUE_BOOL,
-                          gridlib.GRID_VALUE_BOOL,
-                          gridlib.GRID_VALUE_FLOAT + ':6,2',
-                          ]
-
-        self.data = [
-            [1010, "The foo doesn't bar", "major", 1, 'MSW', 1, 1, 1, 1.12],
-            [1011, "I've got a wicket in my wocket", "wish list", 2, 'other', 0, 0, 0, 1.50],
-            [1012, "Rectangle() returns a triangle", "critical", 5, 'all', 0, 0, 0, 1.56]
-
-        ]
-
-
-    #--------------------------------------------------
-    # required methods for the wxPyGridTableBase interface
-
-    def GetNumberRows(self):
-        return len(self.data) + 1
-
-    def GetNumberCols(self):
-        return len(self.data[0])
-
-    def IsEmptyCell(self, row, col):
-        try:
-            return not self.data[row][col]
-        except IndexError:
-            return True
-
-    # Get/Set values in the table.  The Python version of these
-    # methods can handle any data-type, (as long as the Editor and
-    # Renderer understands the type too,) not just strings as in the
-    # C++ version.
-    def GetValue(self, row, col):
-        try:
-            return self.data[row][col]
-        except IndexError:
-            return ''
-
-    def SetValue(self, row, col, value):
-        def innerSetValue(row, col, value):
-            try:
-                self.data[row][col] = value
-            except IndexError:
-                # add a new row
-                self.data.append([''] * self.GetNumberCols())
-                innerSetValue(row, col, value)
-
-                # tell the grid we've added a row
-                msg = gridlib.GridTableMessage(self,            # The table
-                                               gridlib.GRIDTABLE_NOTIFY_ROWS_APPENDED, # what we did to it
-                                               1                                       # how many
-                                               )
-
-                self.GetView().ProcessTableMessage(msg)
-        innerSetValue(row, col, value)
-
-    #--------------------------------------------------
-    # Some optional methods
-
-    # Called when the grid needs to display labels
-    def GetColLabelValue(self, col):
-        return self.colLabels[col]
-
-    # Called to determine the kind of editor/renderer to use by
-    # default, doesn't necessarily have to be the same type used
-    # natively by the editor/renderer if they know how to convert.
-    def GetTypeName(self, row, col):
-        return self.dataTypes[col]
-
-    # Called to determine how the data can be fetched and stored by the
-    # editor and renderer.  This allows you to enforce some type-safety
-    # in the grid.
-    def CanGetValueAs(self, row, col, typeName):
-        colType = self.dataTypes[col].split(':')[0]
-        if typeName == colType:
-            return True
-        else:
-            return False
-
-    def CanSetValueAs(self, row, col, typeName):
-        return self.CanGetValueAs(row, col, typeName)
-
-
-#---------------------------------------------------------------------------
-
-
-class CustTableGrid(gridlib.Grid):
-    def __init__(self, parent, log):
-        gridlib.Grid.__init__(self, parent, -1)
-
-        table = CustomDataTable(log)
-
-        # The second parameter means that the grid is to take ownership of the
-        # table and will destroy it when done.  Otherwise you would need to keep
-        # a reference to it and call it's Destroy method later.
-        self.SetTable(table, True)
-
-        self.SetRowLabelSize(0)
-        self.SetMargins(0,0)
-        self.AutoSizeColumns(False)
-
-        self.Bind(gridlib.EVT_GRID_CELL_LEFT_DCLICK, self.OnLeftDClick)
-
-
-    # I do this because I don't like the default behaviour of not starting the
-    # cell editor on double clicks, but only a second click.
-    def OnLeftDClick(self, evt):
-        if self.CanEnableCellControl():
-            self.EnableCellEditControl()
-
-
-#---------------------------------------------------------------------------
-
-
 
 class ModelImportDataTable(gridlib.GridTableBase):
     def __init__(self, log):
@@ -540,7 +421,7 @@ class ImportModelTableGrid(gridlib.Grid):
             rowNum = 1
             attrId = 1
             attrIdOffset = 0
-            data = []
+            self.data = []
             for header in headers:
                 Logger.print('Model file header[%d]: %s' % (rowNum, header))
                 # Set table to data set
@@ -549,8 +430,8 @@ class ImportModelTableGrid(gridlib.Grid):
                 attrDesc = ""
                 doImport = 1
 
-                data.append([attrId, attrName, attrType, attrDesc, doImport])
-                self.table.SetData(data)
+                self.data.append([attrId, attrName, attrType, attrDesc, doImport])
+                self.table.SetData(self.data)
 
                 rowNum = rowNum + 1
                 attrId = attrIdOffset + rowNum
@@ -778,8 +659,6 @@ class SaveModelDialog(wx.Dialog):
 
 
 #---------------------------------------------------------------------------
-global modelGrid
-global dataAccessGrid
 
 
 class LoadModelDialog(wx.Dialog):
@@ -796,6 +675,9 @@ class LoadModelDialog(wx.Dialog):
         wx.Dialog.__init__(self)
         self.SetExtraStyle(wx.DIALOG_EX_CONTEXTHELP)
         self.Create(parent, id, title, pos, size, style, name)
+
+        self.p1FilterData = []
+        self.p2FilterData = []
 
         # Now continue with the normal construction of the dialog
         # contents
@@ -868,6 +750,127 @@ class LoadModelDialog(wx.Dialog):
         self.SetSizer(sizer)
         sizer.Fit(self)
 
+        self.Bind(wx.adv.EVT_WIZARD_PAGE_CHANGED, self.OnWizPageChanged)
+        self.Bind(wx.adv.EVT_WIZARD_PAGE_CHANGING, self.OnWizPageChanging)
+        self.Bind(wx.adv.EVT_WIZARD_CANCEL, self.OnWizCancel)
+
+    def OnWizPageChanged(self, evt):
+        if evt.GetDirection():
+            dir = "forward"
+        else:
+            dir = "backward"
+
+        page = evt.GetPage()
+
+        if (page.getId() == "p1"):
+            Logger.print("Caught OnWizPageChanged of p1: %s, %s\n" % (dir, page.getId()))
+
+        if (page.getId() == "p2"):
+            Logger.print("Caught OnWizPageChanged of p2: %s, %s\n" % (dir, page.getId()))
+            # Read page 1 and filter data for page2
+            self.dataAccessGrid.data = []
+
+            rowNum = 1
+            attrId = 1
+            attrIdOffset = 0
+            for dataField in self.p1FilterData:
+                Logger.print(dataField)
+                #            Logger.print('Model file header[%d]: %s' % (rowNum, header))
+                # Set table to data set
+                attrName = dataField
+                user = "user A" # TODO: Integrate with real user system
+                role = "admin" # TODO: Integrate with real role system
+                doImport = 1
+                doSecureStore = 1
+
+                self.dataAccessGrid.data.append([attrId, attrName, user, role, doImport, doSecureStore])
+                self.dataAccessGrid.getTable().SetData(self.dataAccessGrid.data)
+
+                rowNum = rowNum + 1
+                attrId = attrIdOffset + rowNum
+
+        if (page.getId() == "p3"):
+            Logger.print("Caught OnWizPageChanged of p3: %s, %s\n" % (dir, page.getId()))
+
+
+
+        Logger.print("OnWizPageChanged: %s, %s\n" % (dir, page.getId()))
+
+    def OnWizPageChanging(self, evt):
+        if evt.GetDirection():
+            dir = "forward"
+        else:
+            dir = "backward"
+
+        page = evt.GetPage()
+
+
+        if (page.getId() == "p1"):
+            # Read page 1 and pass filter data to page 2
+            Logger.print("Read page 1 and pass filter data to page 2")
+
+             # Clear filter data
+            self.p1FilterData = []
+
+            # Populate a list with all fields with doImport
+            rowNum = 1
+            attrId = 1
+            attrIdOffset = 0
+
+            i = 0
+            while i < len(self.modelGrid.data):
+                # On doImport
+                Logger.print("i = %d" % (i))
+
+                if len(self.modelGrid.data) > 0:
+                    Logger.print("Import field %s" % (self.modelGrid.data[i][1]))
+
+                    # Check import field (index 4)
+                    if self.modelGrid.data[i][4] == 1:
+                        # Set table to data set
+                        attrName = self.modelGrid.data[i][1]
+                        user = "user A" # TODO: Integrate with real user system
+                        role = "admin" # TODO: Integrate with real role system
+                        doImport = 1
+                        doSecureStore = 1
+
+                        self.p1FilterData.append([attrId, attrName, user, role, doImport, doSecureStore])
+
+                    rowNum = rowNum + 1
+                    attrId = attrIdOffset + rowNum
+
+                else:
+                    if len(self.modelGrid.data) > 0:
+                        Logger.print("Rejecting field %s" % (self.modelGrid.data[i][1]))
+                i += 1
+
+            Logger.print("Caught OnWizPageChanged of p1: %s, %s\n" % (dir, page.getId()))
+
+
+
+        if (page.getId() == "p2"):
+            Logger.print("Caught OnWizPageChanged of p2: %s, %s\n" % (dir, page.getId()))
+
+
+        # Read page and filter data
+        #self.modelGrid.data = []
+
+        Logger.print("OnWizPageChanging: %s, %s\n" % (dir, page.__class__))
+
+
+    def OnWizCancel(self, evt):
+        if evt.GetDirection():
+            dir = "forward"
+        else:
+            dir = "backward"
+
+        page = evt.GetPage()
+
+        # Read page and filter data
+        #self.modelGrid.data = []
+
+        Logger.print("OnWizCancel: %s, %s\n" % (dir, page.__class__))
+
 
     def OnCreateOpenDialog(self):
         Logger.print("CWD: %s\n" % os.getcwd())
@@ -915,18 +918,26 @@ class LoadModelDialog(wx.Dialog):
         # Create the wizard and the pages
         wizard = wiz(self, -1, "Load Model Wizard")
         page1 = TitledPage(wizard, "Step 1: Verify data header")
+        page1.setId("p1")
+
         page2 = TitledPage(wizard, "Step 2: Data access")
+        page2.setId("p2")
+
         page3 = TitledPage(wizard, "Step 3: Data storage location")
+        page3.setId("p3")
+
         page4 = TitledPage(wizard, "Step 4: Timing")
+        page4.setId("p4")
+
         self.page1 = page1
 
         # Page 1 (Step 1: Verify data header)
-        modelGrid = ImportModelTableGrid(page1, log, paths)
-        page1.sizer.Add(modelGrid, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
+        self.modelGrid = ImportModelTableGrid(page1, log, paths)
+        page1.sizer.Add(self.modelGrid, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
 
         # Page 2 (Step 2: Set accessible data)
-        dataAccessGrid = ImportDataAccessTableGrid(page2, log, paths)
-        page2.sizer.Add(dataAccessGrid, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
+        self.dataAccessGrid = ImportDataAccessTableGrid(page2, log, paths)
+        page2.sizer.Add(self.dataAccessGrid, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
 
         page3.sizer.Add(wx.StaticText(page3, -1, """        
         Step 3: Set secure storage location
