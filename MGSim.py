@@ -436,9 +436,6 @@ class ImportModelTableGrid(gridlib.Grid):
                 rowNum = rowNum + 1
                 attrId = attrIdOffset + rowNum
 
-    def getTable(self):
-        return self.table
-
     # I do this because I don't like the default behaviour of not starting the
     # cell editor on double clicks, but only a second click.
     def OnLeftDClick(self, evt):
@@ -452,9 +449,9 @@ class ImportDataAccessTableGrid(gridlib.Grid):
         gridlib.Grid.__init__(self, parent, -1)
 
         self.table = ModelDataAccessTable(log)
+
         self.data = []
-        # Read paths file
-        self.load(imports)
+        self.load()
 
         # The second parameter means that the grid is to take ownership of the
         # table and will destroy it when done.  Otherwise you would need to keep
@@ -467,36 +464,31 @@ class ImportDataAccessTableGrid(gridlib.Grid):
 
         self.Bind(gridlib.EVT_GRID_CELL_LEFT_DCLICK, self.OnLeftDClick)
 
-    def load(self, imports):
+
+    def load(self):
+
         rowNum = 1
         attrId = 1
         attrIdOffset = 0
-        self.data = []
-        for dataField in imports:
-            Logger.print(dataField)
-#            Logger.print('Model file header[%d]: %s' % (rowNum, header))
-            # Set table to data set
-            attrName = dataField
-            user = "user A" # TODO: Integrate with real user system
-            role = "admin" # TODO: Integrate with real role system
-            doImport = 1
-            doSecureStore = 1
+        #user = self.p1FilterData[i][2] # TODO: Integrate with real user system
+        #role = self.p1FilterData[i][3] # TODO: Integrate with real role system
+        #readAccess = self.p1FilterData[i][4]
+        #secureStore = self.p1FilterData[i][5]
 
-            self.data.append([attrId, attrName, user, role, doImport, doSecureStore])
-            self.table.SetData(self.data)
+        #id,i
+        #attrName,s
+        #user,c
+        #role,c
+        #readAccess,b
+        #secureStore,b
 
-            rowNum = rowNum + 1
-            attrId = attrIdOffset + rowNum
+        self.data.append([0, '', '', '', 0, 0])
+        #self.data.append([attrId, attrName, attrType, attrDesc, doImport])
+        self.table.SetData(self.data)
 
-
-    def getTable(self):
-        return self.table
-
-#    def updateDataImports(grid):
-        #global modelGrid
-        #global dataAccessGrid
-        # Check model grid table for import field
-
+    def reload(self):
+        Logger.print('Reload %d rows of data.' % len(self.data))
+        self.table.SetData(self.data)
 
     # I do this because I don't like the default behaviour of not starting the
     # cell editor on double clicks, but only a second click.
@@ -506,7 +498,6 @@ class ImportDataAccessTableGrid(gridlib.Grid):
 
 
 #---------------------------------------------------------------------------
-
 
 #---------------------------------------------------------------------------
 class SaveModelDialog(wx.Dialog):
@@ -770,24 +761,39 @@ class LoadModelDialog(wx.Dialog):
             # Read page 1 and filter data for page2
             self.dataAccessGrid.data = []
 
+            i = 0
             rowNum = 1
             attrId = 1
             attrIdOffset = 0
-            for dataField in self.p1FilterData:
-                Logger.print(dataField)
-                #            Logger.print('Model file header[%d]: %s' % (rowNum, header))
-                # Set table to data set
-                attrName = dataField
-                user = "user A" # TODO: Integrate with real user system
-                role = "admin" # TODO: Integrate with real role system
-                doImport = 1
-                doSecureStore = 1
+            while i < len(self.p1FilterData):
+                # On doImport
+                Logger.print("i = %d" % (i))
 
-                self.dataAccessGrid.data.append([attrId, attrName, user, role, doImport, doSecureStore])
-                self.dataAccessGrid.getTable().SetData(self.dataAccessGrid.data)
+                if len(self.p1FilterData) > 0:
+                    Logger.print("Set data access for field: %s" % (self.p1FilterData[i][1]))
 
-                rowNum = rowNum + 1
-                attrId = attrIdOffset + rowNum
+                    attrId = i
+                    attrName = self.p1FilterData[i][1]
+                    user = self.p1FilterData[i][2] # TODO: Integrate with real user system
+                    role = self.p1FilterData[i][3] # TODO: Integrate with real role system
+                    readAccess = self.p1FilterData[i][4]
+                    secureStore = self.p1FilterData[i][5]
+
+                    #id,i
+                    #attrName,s
+                    #user,c
+                    #role,c
+                    #readAccess,b
+                    #secureStore,b
+
+                    self.dataAccessGrid.data.append([attrId, attrName, user, role, readAccess, secureStore])
+                else:
+                    if len(self.p1FilterData) > 0:
+                        Logger.print("Rejecting data field %s" % (self.p1FilterData[i][1]))
+                i += 1
+
+            self.dataAccessGrid.reload()
+
 
         if (page.getId() == "p3"):
             Logger.print("Caught OnWizPageChanged of p3: %s, %s\n" % (dir, page.getId()))
@@ -823,7 +829,7 @@ class LoadModelDialog(wx.Dialog):
                 Logger.print("i = %d" % (i))
 
                 if len(self.modelGrid.data) > 0:
-                    Logger.print("Import field %s" % (self.modelGrid.data[i][1]))
+                    Logger.print("Import data field: %s" % (self.modelGrid.data[i][1]))
 
                     # Check import field (index 4)
                     if self.modelGrid.data[i][4] == 1:
