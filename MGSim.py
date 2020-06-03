@@ -122,6 +122,9 @@ ID_ExportPattern = wx.NewIdRef()
 ID_FirstPerspective = wx.NewIdRef(100)
 
 
+#---------------------------------------------------------------------------
+
+
 # Dimensions of the window we are drawing into.
 win_width = 1024
 win_height = int(win_width * 9.0 / 16.0)
@@ -168,6 +171,114 @@ global log
 log = Log()
 
 
+
+import wx
+
+########################################################################
+class WizardPage(wx.Panel):
+    """"""
+
+    #----------------------------------------------------------------------
+    def __init__(self, parent, title, pageId="", grid=None):
+        """Constructor"""
+        wx.Panel.__init__(self, parent)
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        self.SetSizer(sizer)
+
+        if pageId:
+            self.pageId = pageId
+
+#        if grid:
+#            self.grid = grid
+
+        if title:
+            title = wx.StaticText(self, -1, title)
+            title.SetFont(wx.Font(18, wx.SWISS, wx.NORMAL, wx.BOLD))
+            sizer.Add(title, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
+            sizer.Add(wx.StaticLine(self, -1), 0, wx.EXPAND|wx.ALL, 5)
+ #           if grid:
+ #               sizer.Add(self.grid, 0, wx.EXPAND|wx.ALL, 5)
+
+########################################################################
+class WizardPanel(wx.Panel):
+    """"""
+
+    #----------------------------------------------------------------------
+    def __init__(self, parent):
+        """Constructor"""
+        wx.Panel.__init__(self, parent=parent)
+        self.pages = []
+        self.page_num = 0
+
+        self.mainSizer = wx.BoxSizer(wx.VERTICAL)
+        self.panelSizer = wx.BoxSizer(wx.VERTICAL)
+        btnSizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        # add prev/next buttons
+        self.prevBtn = wx.Button(self, label="Previous")
+        self.prevBtn.Bind(wx.EVT_BUTTON, self.onPrev)
+        btnSizer.Add(self.prevBtn, 0, wx.ALL, 5)
+
+        self.nextBtn = wx.Button(self, label="Next")
+        self.nextBtn.Bind(wx.EVT_BUTTON, self.onNext)
+        btnSizer.Add(self.nextBtn, 0, wx.ALL, 5)
+
+        # finish layout
+        self.mainSizer.Add(self.panelSizer, 1, wx.EXPAND)
+        self.mainSizer.Add(btnSizer, 0, wx.EXPAND)
+        self.SetSizer(self.mainSizer)
+
+
+    #----------------------------------------------------------------------
+    def addPage(self, title, pageId="", grid=None):
+        """"""
+
+        if grid:
+            panel = WizardPage(self, title, pageId, grid)
+        else:
+            panel = WizardPage(self, title, pageId)
+        self.panelSizer.Add(panel, 2, wx.EXPAND)
+        self.pages.append(panel)
+        if len(self.pages) > 1:
+            # hide all panels after the first one
+            panel.Hide()
+            self.Layout()
+
+    #----------------------------------------------------------------------
+    def onNext(self, event):
+        """"""
+        pageCount = len(self.pages)
+        if pageCount-1 != self.page_num:
+            self.pages[self.page_num].Hide()
+            self.page_num += 1
+            self.pages[self.page_num].Show()
+            self.panelSizer.Layout()
+        else:
+            Logger.print("End of pages!")
+
+        if self.nextBtn.GetLabel() == "Finish":
+            # close the app
+            self.GetParent().Close()
+
+        if pageCount == self.page_num+1:
+            # change label
+            self.nextBtn.SetLabel("Finish")
+
+    #----------------------------------------------------------------------
+    def onPrev(self, event):
+        """"""
+        pageCount = len(self.pages)
+        if self.page_num-1 != -1:
+            self.pages[self.page_num].Hide()
+            self.page_num -= 1
+            self.pages[self.page_num].Show()
+            self.panelSizer.Layout()
+        else:
+            Logger.print("You're already on the first page!")
+
+
+########################################################################
 #----------------------------------------------------------------------
 
 def makePageTitle(wizPg, title):
@@ -178,8 +289,9 @@ def makePageTitle(wizPg, title):
     sizer.Add(title, 0, wx.ALIGN_LEFT|wx.ALL, 5)
     sizer.Add(wx.StaticLine(wizPg, -1), 0, wx.EXPAND|wx.ALL, 5)
 
-    box = wx.BoxSizer(wx.HORIZONTAL)
+    box = wx.BoxSizer(wx.VERTICAL)
     sizer.Add(box, 0, wx.EXPAND|wx.ALL, 5)
+    # TODO Update sizer to expand vertically on grid update
     return sizer
 
 #----------------------------------------------------------------------
@@ -214,14 +326,25 @@ class ModelImportDataTable(gridlib.GridTableBase):
         self.data = [
             [1010, "Demo Attribute 1", "numeric", '', 1],
             [1011, "Demo Attribute 2", "string", '', 1]
-
-#            [1010, "Demo Attribute 1", "numeric", '', 1]
-#            [1011, "I've got a wicket in my wocket", "wish list", 2, 'other', 0, 0, 0, 1.50],
- #           [1012, "Rectangle() returns a triangle", "critical", 5, 'all', 0, 0, 0, 1.56]
-
         ]
 
-    #--------------------------------------------------
+    def Notify(self):
+        grid = self.GetView()
+        # Notify the grid
+        #grid.BeginBatch()
+        #msg = gridlib.GridTableMessage(
+        #    gridlib.GRIDTABLE_NOTIFY_COLS_DELETED, self, 1
+        #)
+        #grid.ProcessTableMessage(msg)
+
+        #msg = gridlib.GridTableMessage(
+        #    gridlib.GRIDTABLE_NOTIFY_COLS_INSERTED, self, 1
+        #)
+        #grid.ProcessTableMessage(msg)
+        #grid.EndBatch()
+
+
+#--------------------------------------------------
     # required methods for the wxPyGridTableBase interface
 
     def GetNumberRows(self):
@@ -249,6 +372,7 @@ class ModelImportDataTable(gridlib.GridTableBase):
     def SetData(self, data):
         self.data = data
 
+
     def SetValue(self, row, col, value):
         def innerSetValue(row, col, value):
             try:
@@ -257,14 +381,6 @@ class ModelImportDataTable(gridlib.GridTableBase):
                 # add a new row
                 self.data.append([''] * self.GetNumberCols())
                 innerSetValue(row, col, value)
-
-                # tell the grid we've added a row
-                msg = gridlib.GridTableMessage(self,            # The table
-                                               gridlib.GRIDTABLE_NOTIFY_ROWS_APPENDED, # what we did to it
-                                               1                                       # how many
-                                               )
-
-                self.GetView().ProcessTableMessage(msg)
         innerSetValue(row, col, value)
 
     #--------------------------------------------------
@@ -311,11 +427,117 @@ class ModelDataAccessTable(gridlib.GridTableBase):
                           gridlib.GRID_VALUE_BOOL,
                           gridlib.GRID_VALUE_BOOL
                           ]
+#        self.grid.Bind(wx.EVT_SIZE, self.OnSize)
 
-        self.data = []
 
     #--------------------------------------------------
     # required methods for the wxPyGridTableBase interface
+
+ #   def OnSize(self, event):
+#        width, height = self.GetClientSizeTuple()
+#        for col in range(4):
+#            self.grid.SetColSize(col, width/(4 + 1))
+
+    def ResetView(self):
+        """Trim/extend the control's rows and update all values"""
+        self.getGrid().BeginBatch()
+        for current, new, delmsg, addmsg in [
+            (self.currentRows, self.GetNumberRows(), gridlib.GRIDTABLE_NOTIFY_ROWS_DELETED, gridlib.GRIDTABLE_NOTIFY_ROWS_APPENDED),
+            (self.currentColumns, self.GetNumberCols(), gridlib.GRIDTABLE_NOTIFY_COLS_DELETED, gridlib.GRIDTABLE_NOTIFY_COLS_APPENDED),
+        ]:
+            if new < current:
+                msg = gridlib.GridTableMessage(
+                    self,
+                    delmsg,
+                    new,    # position
+                    current-new,
+                    )
+                self.getGrid().ProcessTableMessage(msg)
+            elif new > current:
+                msg = gridlib.GridTableMessage(
+                    self,
+                    addmsg,
+                    new-current
+                )
+                self.getGrid().ProcessTableMessage(msg)
+        self.UpdateValues()
+        self.getGrid().EndBatch()
+
+        # The scroll bars aren't resized (at least on windows)
+        # Jiggling the size of the window rescales the scrollbars
+        h,w = grid.GetSize()
+        grid.SetSize((h+1, w))
+        grid.SetSize((h, w))
+        grid.ForceRefresh()
+
+    def Notify(self):
+        grid = self.GetView()
+        # Notify the grid
+        grid.BeginBatch()
+        msg = gridlib.GridTableMessage(
+            gridlib.GRIDTABLE_NOTIFY_COLS_DELETED, self, 1
+        )
+        grid.ProcessTableMessage(msg)
+
+        msg = gridlib.GridTableMessage(
+            gridlib.GRIDTABLE_NOTIFY_COLS_INSERTED, self, 1
+        )
+        grid.ProcessTableMessage(msg)
+        grid.EndBatch()
+
+
+    def UpdateValues( self ):
+        """Update all displayed values"""
+        msg = gridlib.GridTableMessage(self, gridlib.GRIDTABLE_REQUEST_VIEW_GET_VALUES)
+        self.getGrid().ProcessTableMessage(msg)
+
+    def AppendRow(self, row):
+        #print('append')
+        entry = {}
+
+        i = 1
+        while i < row:
+
+            for name in self.colLabels:
+                entry[name] = "Appended_%i"%i
+
+            # XXX Hack
+            # entry["A"] can only be between 1..4
+            entry["A"] = random.choice(range(4))
+            self.data.insert(i, ["Append_%i"%i, entry])
+            i = i + 1
+
+            grid = self.GetView()
+
+
+            # Notify the grid
+#            grid.BeginBatch()
+#            msg = gridlib.GridTableMessage(self,
+#                gridlib.GRIDTABLE_NOTIFY_COLS_DELETED)
+#            grid.ProcessTableMessage(msg)
+
+ #           msg = gridlib.GridTableMessage(self,
+ #               gridlib.GRIDTABLE_NOTIFY_COLS_INSERTED)
+ #           grid.ProcessTableMessage(msg)
+ #           grid.EndBatch()
+
+            # tell the grid we've added a row
+            msg = gridlib.GridTableMessage(self,                                    # The table
+                                           gridlib.GRIDTABLE_NOTIFY_ROWS_APPENDED,  # what we did to it
+                                           1                                        # how many
+                                           )
+
+            self.GetView().ProcessTableMessage(msg)
+
+        # The scroll bars aren't resized (at least on windows)
+        # Jiggling the size of the window rescales the scrollbars
+        h,w = grid.GetSize()
+        grid.SetSize((h+1, w))
+        grid.SetSize((h, w))
+        grid.ForceRefresh()
+
+        Logger.print("Post-Append Row(): data size is %d" % (len(self.data)))
+
 
     def GetNumberRows(self):
         return len(self.data) + 1
@@ -406,7 +628,8 @@ class ImportModelTableGrid(gridlib.Grid):
 
         self.SetRowLabelSize(0)
         self.SetMargins(0,0)
-        self.AutoSizeColumns(False)
+        #self.AutoSizeColumns(False)
+        self.AutoSize()
 
         self.Bind(gridlib.EVT_GRID_CELL_LEFT_DCLICK, self.OnLeftDClick)
 
@@ -460,20 +683,14 @@ class ImportDataAccessTableGrid(gridlib.Grid):
 
         self.SetRowLabelSize(0)
         self.SetMargins(0,0)
-        self.AutoSizeColumns(False)
+#        self.AutoSizeColumns(False)
+        self.AutoSize()
+
 
         self.Bind(gridlib.EVT_GRID_CELL_LEFT_DCLICK, self.OnLeftDClick)
 
 
     def load(self):
-
-        rowNum = 1
-        attrId = 1
-        attrIdOffset = 0
-        #user = self.p1FilterData[i][2] # TODO: Integrate with real user system
-        #role = self.p1FilterData[i][3] # TODO: Integrate with real role system
-        #readAccess = self.p1FilterData[i][4]
-        #secureStore = self.p1FilterData[i][5]
 
         #id,i
         #attrName,s
@@ -488,7 +705,22 @@ class ImportDataAccessTableGrid(gridlib.Grid):
 
     def reload(self):
         Logger.print('Reload %d rows of data.' % len(self.data))
+        newRows = 0
+        if self.table.GetRowsCount() < len(self.data):
+            newRows = len(self.data)-self.table.GetRowsCount()
+            Logger.print('Inserting %d rows of data.' % (newRows))
+
+        if (newRows > 0):
+            self.table.AppendRow(newRows)
+
         self.table.SetData(self.data)
+
+        msg = gridlib.GridTableMessage(self.table,                                    # The table
+                                         gridlib.GRIDTABLE_NOTIFY_ROWS_APPENDED, # what we did to it
+                                       1                                       # how many
+                                       )
+        self.table.GetView().ProcessTableMessage(msg)
+
 
     # I do this because I don't like the default behaviour of not starting the
     # cell editor on double clicks, but only a second click.
@@ -496,8 +728,6 @@ class ImportDataAccessTableGrid(gridlib.Grid):
         if self.CanEnableCellControl():
             self.EnableCellEditControl()
 
-
-#---------------------------------------------------------------------------
 
 #---------------------------------------------------------------------------
 class SaveModelDialog(wx.Dialog):
@@ -670,6 +900,7 @@ class LoadModelDialog(wx.Dialog):
         self.p1FilterData = []
         self.p2FilterData = []
 
+
         # Now continue with the normal construction of the dialog
         # contents
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -677,7 +908,11 @@ class LoadModelDialog(wx.Dialog):
         label = wx.StaticText(self, -1, "Load Model")
         label.SetHelpText("This will load the model.")
         sizer.Add(label, 0, wx.ALIGN_LEFT|wx.ALL, 5)
+
+
+
         '''
+        
         box = wx.BoxSizer(wx.HORIZONTAL)
 
         label = wx.StaticText(self, -1, "Model Name:")
@@ -793,7 +1028,6 @@ class LoadModelDialog(wx.Dialog):
                 i += 1
 
             self.dataAccessGrid.reload()
-
 
         if (page.getId() == "p3"):
             Logger.print("Caught OnWizPageChanged of p3: %s, %s\n" % (dir, page.getId()))
@@ -921,51 +1155,15 @@ class LoadModelDialog(wx.Dialog):
 
     def OnRunLoadModelWizard(self, paths):
 
-        # Create the wizard and the pages
-        wizard = wiz(self, -1, "Load Model Wizard")
-        page1 = TitledPage(wizard, "Step 1: Verify data header")
-        page1.setId("p1")
+        # Create wizardFrame
+        wizardFrame = WizardFrame(self, paths, wx.ID_ANY, "Load Model Wizard", size=(1024, 500))
 
-        page2 = TitledPage(wizard, "Step 2: Data access")
-        page2.setId("p2")
 
-        page3 = TitledPage(wizard, "Step 3: Data storage location")
-        page3.setId("p3")
 
-        page4 = TitledPage(wizard, "Step 4: Timing")
-        page4.setId("p4")
-
-        self.page1 = page1
-
-        # Page 1 (Step 1: Verify data header)
-        self.modelGrid = ImportModelTableGrid(page1, log, paths)
-        page1.sizer.Add(self.modelGrid, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
-
-        # Page 2 (Step 2: Set accessible data)
-        self.dataAccessGrid = ImportDataAccessTableGrid(page2, log, paths)
-        page2.sizer.Add(self.dataAccessGrid, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
-
-        page3.sizer.Add(wx.StaticText(page3, -1, """        
-        Step 3: Set secure storage location
-        """))
-
-        page4.sizer.Add(wx.StaticText(page4, -1, """
-        Step 4: When can data be loaded?
-        """))
-
-        wizard.FitToPage(page2)
-#        wizard.SetMinSize(wx.Size(1024, 600))
-
-        # Use the convenience Chain function to connect the pages
-        WizardPageSimple.Chain(page1, page2)
-        WizardPageSimple.Chain(page2, page3)
-        WizardPageSimple.Chain(page3, page4)
-
-        wizard.GetPageAreaSizer().Add(page1)
-        if wizard.RunWizard(page1):
-            wx.MessageBox("Wizard completed successfully", "Load Model complete.")
-        else:
-            wx.MessageBox("Wizard was cancelled", "Load Model incomplete!")
+#    if wizard.RunWizard(page1):
+#            wx.MessageBox("Wizard completed successfully", "Load Model complete.")
+#        else:
+#            wx.MessageBox("Wizard was cancelled", "Load Model incomplete!")
 
 
     def OnChooseLoadModelFileButton(self, evt):
@@ -1053,6 +1251,37 @@ class TestDialog(wx.Dialog):
 
         self.SetSizer(sizer)
         sizer.Fit(self)
+
+
+
+
+#---------------------------------------------------------------------------
+
+
+class WizardFrame(wx.Frame):
+
+    def __init__(self, parent, paths, id=-1, title="", pos=wx.DefaultPosition,
+                 size=wx.DefaultSize, style=wx.DEFAULT_FRAME_STYLE |
+                                            wx.SUNKEN_BORDER |
+                                            wx.CLIP_CHILDREN):
+
+        wx.Frame.__init__(self, parent, id, title, pos, size, style)
+        self.paths = paths
+
+        # Page 1 (Step 1: Verify data header)
+        self.modelGrid = ImportModelTableGrid(self, log, paths)
+
+        imports = paths
+        # Page 2 (Step 2: Set accessible data)
+#        self.dataAccessGrid = ImportDataAccessTableGrid(self, log, imports)
+
+        self.panel = WizardPanel(self)
+#        self.panel.addPage("Step 1: Verify data header", "p1")
+#        self.panel.addPage("Step 2: Data access", "p2")
+#        self.panel.addPage("Step 3: Data storage location", "p3")
+#        self.panel.addPage("Step 4: Timing", "p4")
+        self.Show()
+
 
 
 #---------------------------------------------------------------------------
