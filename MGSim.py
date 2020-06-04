@@ -179,7 +179,7 @@ class WizardPage(wx.Panel):
     """"""
 
     #----------------------------------------------------------------------
-    def __init__(self, parent, title, pageId="", grid=None):
+    def __init__(self, parent, title, pageId=""):
         """Constructor"""
         wx.Panel.__init__(self, parent)
 
@@ -197,7 +197,8 @@ class WizardPage(wx.Panel):
             title.SetFont(wx.Font(18, wx.SWISS, wx.NORMAL, wx.BOLD))
             sizer.Add(title, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
             sizer.Add(wx.StaticLine(self, -1), 0, wx.EXPAND|wx.ALL, 5)
- #           if grid:
+ #
+ #       if grid:
  #               sizer.Add(self.grid, 0, wx.EXPAND|wx.ALL, 5)
 
 ########################################################################
@@ -231,13 +232,10 @@ class WizardPanel(wx.Panel):
 
 
     #----------------------------------------------------------------------
-    def addPage(self, title, pageId="", grid=None):
+    def addPage(self, title, pageId=""):
         """"""
 
-        if grid:
-            panel = WizardPage(self, title, pageId, grid)
-        else:
-            panel = WizardPage(self, title, pageId)
+        panel = WizardPage(self, title, pageId)
         self.panelSizer.Add(panel, 2, wx.EXPAND)
         self.pages.append(panel)
         if len(self.pages) > 1:
@@ -301,6 +299,7 @@ class TitledPage(wx.adv.WizardPageSimple):
         self.title = title
         WizardPageSimple.__init__(self, parent)
         self.sizer = makePageTitle(self, title)
+        Logger.print("Creating title page")
 
     def setId(self, id):
         self.id = id
@@ -1140,13 +1139,15 @@ class LoadModelDialog(wx.Dialog):
 
             Logger.print('You selected %d files:' % len(paths))
 
+            pathList = ""
             for path in paths:
                 Logger.print('           %s\n' % path)
+                pathList = ';' + pathList + path
 
-            # Call our wizard
-            self.OnRunLoadModelWizard(paths)
+            self.modelFileText.SetValue(pathList)
 
-        # Compare this with the debug above; did we change working dirs?
+
+    # Compare this with the debug above; did we change working dirs?
         Logger.print("CWD: %s\n" % os.getcwd())
 
         # Destroy the dialog. Don't do this until you are done with it!
@@ -1156,8 +1157,10 @@ class LoadModelDialog(wx.Dialog):
     def OnRunLoadModelWizard(self, paths):
 
         # Create wizardFrame
-        wizardFrame = WizardFrame(self, paths, wx.ID_ANY, "Load Model Wizard", size=(1024, 500))
+        wizardFrame = WizardFrame(self.GetGrandParent(), paths, wx.ID_ANY, "Load Model Wizard", size=(1024, 500))
 
+        # Call our wizard
+    #            self.OnRunLoadModelWizard(paths)
 
 
 #    if wizard.RunWizard(page1):
@@ -1165,20 +1168,25 @@ class LoadModelDialog(wx.Dialog):
 #        else:
 #            wx.MessageBox("Wizard was cancelled", "Load Model incomplete!")
 
-
     def OnChooseLoadModelFileButton(self, evt):
         self.OnCreateOpenDialog()
 
     def OnLoadModelButton(self, evt):
-        loadModelName = self.modelNameText.GetValue()
+        #loadModelName = self.modelNameText.GetValue()
         loadModelFile = self.modelFileText.GetValue()
 
-        Logger.print("Load model %s" % loadModelName)
+        Logger.print("Load model %s" % loadModelFile)
 
         engine = create_engine('postgresql://master:munvo123@localhost:5432/mgsim')
         #apr_csv_data = pd.read_csv(r'/home/my_linux_user/pg_py_database/apr_2019_hiking_stats.csv')
+        # Remove semi-colon header
+        loadModelFile = loadModelFile[1:]
         apr_csv_data = pd.read_csv(loadModelFile)
         apr_csv_data.head()
+
+        paths = loadModelFile
+        self.OnRunLoadModelWizard(paths)
+
 
 
 class TestDialog(wx.Dialog):
@@ -1269,14 +1277,14 @@ class WizardFrame(wx.Frame):
         self.paths = paths
 
         # Page 1 (Step 1: Verify data header)
-        self.modelGrid = ImportModelTableGrid(self, log, paths)
+        #self.modelGrid = ImportModelTableGrid(self, log, paths)
 
         imports = paths
         # Page 2 (Step 2: Set accessible data)
 #        self.dataAccessGrid = ImportDataAccessTableGrid(self, log, imports)
 
         self.panel = WizardPanel(self)
-#        self.panel.addPage("Step 1: Verify data header", "p1")
+        self.panel.addPage("Step 1: Verify data header", "p1")
 #        self.panel.addPage("Step 2: Data access", "p2")
 #        self.panel.addPage("Step 3: Data storage location", "p3")
 #        self.panel.addPage("Step 4: Timing", "p4")
