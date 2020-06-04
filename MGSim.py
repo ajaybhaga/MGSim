@@ -3,9 +3,10 @@
 # Name:         MGSim.py
 # Purpose:      Munvo Message Gateway Simulator
 #
-# Author:       Ajay Bhaga (ajay.bhaga@munvo.com)
+# Author(s):    Ajay Bhaga (ajay.bhaga@munvo.com)
 #
 # Created:      25-May-2020
+# Modified:     04-Jun-2020
 # Copyright:    (c) 2020 by Munvo
 #----------------------------------------------------------------------------
 
@@ -632,31 +633,30 @@ class ImportModelTableGrid(gridlib.Grid):
 
         self.Bind(gridlib.EVT_GRID_CELL_LEFT_DCLICK, self.OnLeftDClick)
 
-    def load(self, paths):
-        for path in paths:
-            #engine = create_engine('postgresql://master:munvo123@localhost:5432/mgsim')
-            apr_csv_data = pd.read_csv(path)
-            Logger.print('Read model file %s' % path)
-            headers = apr_csv_data.head(1)
-            Logger.print(headers)
+    def load(self, path):
+        #engine = create_engine('postgresql://master:munvo123@localhost:5432/mgsim')
+        apr_csv_data = pd.read_csv(path)
+        Logger.print('Read model file %s' % path)
+        headers = apr_csv_data.head(1)
+        Logger.print(headers)
 
-            rowNum = 1
-            attrId = 1
-            attrIdOffset = 0
-            self.data = []
-            for header in headers:
-                Logger.print('Model file header[%d]: %s' % (rowNum, header))
-                # Set table to data set
-                attrName = header
-                attrType = "string"
-                attrDesc = ""
-                doImport = 1
+        rowNum = 1
+        attrId = 1
+        attrIdOffset = 0
+        self.data = []
+        for header in headers:
+            Logger.print('Model file header[%d]: %s' % (rowNum, header))
+            # Set table to data set
+            attrName = header
+            attrType = "string"
+            attrDesc = ""
+            doImport = 1
 
-                self.data.append([attrId, attrName, attrType, attrDesc, doImport])
-                self.table.SetData(self.data)
+            self.data.append([attrId, attrName, attrType, attrDesc, doImport])
+            self.table.SetData(self.data)
 
-                rowNum = rowNum + 1
-                attrId = attrIdOffset + rowNum
+            rowNum = rowNum + 1
+            attrId = attrIdOffset + rowNum
 
     # I do this because I don't like the default behaviour of not starting the
     # cell editor on double clicks, but only a second click.
@@ -1154,10 +1154,10 @@ class LoadModelDialog(wx.Dialog):
         # BAD things can happen otherwise!
         dlg.Destroy()
 
-    def OnRunLoadModelWizard(self, paths):
+    def OnRunLoadModelWizard(self, path):
 
         # Create wizardFrame
-        wizardFrame = WizardFrame(self.GetGrandParent(), paths, wx.ID_ANY, "Load Model Wizard", size=(1024, 500))
+        wizardFrame = WizardFrame(self, path, wx.ID_ANY, "Load Model Wizard", size=(1024, 500))
 
         # Call our wizard
     #            self.OnRunLoadModelWizard(paths)
@@ -1181,11 +1181,11 @@ class LoadModelDialog(wx.Dialog):
         #apr_csv_data = pd.read_csv(r'/home/my_linux_user/pg_py_database/apr_2019_hiking_stats.csv')
         # Remove semi-colon header
         loadModelFile = loadModelFile[1:]
+        Logger.print("loadModelFile -> loading %s" % (loadModelFile))
         apr_csv_data = pd.read_csv(loadModelFile)
         apr_csv_data.head()
 
-        paths = loadModelFile
-        self.OnRunLoadModelWizard(paths)
+        self.OnRunLoadModelWizard(loadModelFile)
 
 
 
@@ -1268,26 +1268,26 @@ class TestDialog(wx.Dialog):
 
 class WizardFrame(wx.Frame):
 
-    def __init__(self, parent, paths, id=-1, title="", pos=wx.DefaultPosition,
+    def __init__(self, parent, path, id=-1, title="", pos=wx.DefaultPosition,
                  size=wx.DefaultSize, style=wx.DEFAULT_FRAME_STYLE |
                                             wx.SUNKEN_BORDER |
                                             wx.CLIP_CHILDREN):
 
         wx.Frame.__init__(self, parent, id, title, pos, size, style)
-        self.paths = paths
+        self.path = path
 
         # Page 1 (Step 1: Verify data header)
-        #self.modelGrid = ImportModelTableGrid(self, log, paths)
+        self.modelGrid = ImportModelTableGrid(self, log, path)
 
-        imports = paths
+        imports = path
         # Page 2 (Step 2: Set accessible data)
 #        self.dataAccessGrid = ImportDataAccessTableGrid(self, log, imports)
 
         self.panel = WizardPanel(self)
         self.panel.addPage("Step 1: Verify data header", "p1")
-#        self.panel.addPage("Step 2: Data access", "p2")
-#        self.panel.addPage("Step 3: Data storage location", "p3")
-#        self.panel.addPage("Step 4: Timing", "p4")
+        self.panel.addPage("Step 2: Data access", "p2")
+        self.panel.addPage("Step 3: Data storage location", "p3")
+        self.panel.addPage("Step 4: Timing", "p4")
         self.Show()
 
 
