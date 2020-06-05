@@ -903,7 +903,8 @@ class LoadModelDialog(wx.Dialog):
         # creation, and then we create the GUI object using the Create
         # method.
         wx.Dialog.__init__(self)
-        self.SetExtraStyle(wx.DIALOG_EX_CONTEXTHELP)
+        #self.SetExtraStyle(wx.DIALOG_EX_CONTEXTHELP)
+        #self.SetExtraStyle()
         self.Create(parent, id, title, pos, size, style, name)
 
         self.p1FilterData = []
@@ -971,6 +972,9 @@ class LoadModelDialog(wx.Dialog):
         self.Bind(wx.EVT_BUTTON, self.OnLoadModelButton, btn)
         #        self.Bind(wx.EVT_TOOL, self.OnToolClick, id=101)
         #        self.Bind(wx.EVT_TOOL_RCLICKED, self.OnToolRClick, id=101)
+
+#        self.Bind(wx.EVT_CLOSE, self.OnRunLoadModelWizard, btn)
+#        self.OnRunLoadModelWizard(loadModelFile)
 
 
         btnsizer.AddButton(btn)
@@ -1164,36 +1168,42 @@ class LoadModelDialog(wx.Dialog):
         # BAD things can happen otherwise!
         dlg.Destroy()
 
-    def OnRunLoadModelWizard(self, path):
+    def OnRunLoadModelWizard(self):
+
+        Logger.print("OnRunLoadModelWizard()")
+        #loadModelName = self.modelNameText.GetValue()
+        loadModelFile = self.modelFileText.GetValue()
+        # Remove semi-colon header
+        loadModelFile = loadModelFile[1:]
+        Logger.print("loadModelFile -> loading %s" % (loadModelFile))
 
         # Create wizardFrame
-        wizardFrame = WizardFrame(self, path, wx.ID_ANY, "Load Model Wizard", size=(1024, 500))
+        wizardFrame = WizardFrame(self.GetTopLevelParent(), loadModelFile, wx.ID_ANY, "Load Model Wizard", size=(1024, 500))
         wizardFrame.Show()
+        wizardFrame.SetFocus()
 
-#    if wizard.RunWizard(page1):
 #            wx.MessageBox("Wizard completed successfully", "Load Model complete.")
-#        else:
 #            wx.MessageBox("Wizard was cancelled", "Load Model incomplete!")
 
     def OnChooseLoadModelFileButton(self, evt):
         self.OnCreateOpenDialog()
 
     def OnLoadModelButton(self, evt):
+
+        Logger.print("OnLoadModelButton()")
         #loadModelName = self.modelNameText.GetValue()
         loadModelFile = self.modelFileText.GetValue()
-
-        Logger.print("Load model %s" % loadModelFile)
-
-        engine = create_engine('postgresql://master:munvo123@localhost:5432/mgsim')
-        #apr_csv_data = pd.read_csv(r'/home/my_linux_user/pg_py_database/apr_2019_hiking_stats.csv')
         # Remove semi-colon header
         loadModelFile = loadModelFile[1:]
         Logger.print("loadModelFile -> loading %s" % (loadModelFile))
-        apr_csv_data = pd.read_csv(loadModelFile)
-        apr_csv_data.head()
 
-        self.OnRunLoadModelWizard(loadModelFile)
+        self.OnRunLoadModelWizard()
+        self.EndModal(0)
 
+        #engine = create_engine('postgresql://master:munvo123@localhost:5432/mgsim')
+        #apr_csv_data = pd.read_csv(r'/home/my_linux_user/pg_py_database/apr_2019_hiking_stats.csv')
+        #apr_csv_data = pd.read_csv(loadModelFile)
+        #apr_csv_data.head()
 
 
 class TestDialog(wx.Dialog):
@@ -1277,7 +1287,7 @@ class WizardFrame(wx.Frame):
 
     def __init__(self, parent, path, id=-1, title="", pos=wx.DefaultPosition,
                  size=wx.DefaultSize, style=wx.DEFAULT_FRAME_STYLE |
-                                            wx.SUNKEN_BORDER):
+                                            wx.SUNKEN_BORDER | wx.STAY_ON_TOP):
                                             #|
                                             #wx.CLIP_CHILDREN):
 
@@ -1296,6 +1306,7 @@ class WizardFrame(wx.Frame):
         self.panel.addPage("Step 2: Data access", "p2")
         self.panel.addPage("Step 3: Data storage location", "p3")
         self.panel.addPage("Step 4: Timing", "p4")
+        self.panel.SetFocus()
 
 
 
@@ -1600,7 +1611,7 @@ class PyAUIFrame(wx.Frame):
     def OnTool102(self):
         Logger.print('Tool 102');
         dlg = LoadModelDialog(self, -1, "Load Model", size=(350, 200),
-                         style=wx.DEFAULT_DIALOG_STYLE)
+                         style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT)
         dlg.ShowWindowModal()
 
     def OnTool103(self):
