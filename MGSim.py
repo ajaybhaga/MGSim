@@ -184,7 +184,7 @@ class WizardPage(wx.Panel):
         """Constructor"""
         wx.Panel.__init__(self, parent)
 
-        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.SetSizer(sizer)
 
         if pageId:
@@ -195,12 +195,12 @@ class WizardPage(wx.Panel):
 
         if title:
             title = wx.StaticText(self, -1, title)
-            title.SetFont(wx.Font(18, wx.SWISS, wx.NORMAL, wx.BOLD))
-            sizer.Add(title, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
-            sizer.Add(wx.StaticLine(self, -1), 0, wx.EXPAND|wx.ALL, 5)
- #
- #       if grid:
- #               sizer.Add(self.grid, 0, wx.EXPAND|wx.ALL, 5)
+            title.SetFont(wx.Font(8, wx.SWISS, wx.NORMAL, wx.BOLD))
+            sizer.Add(title, 0, wx.ALIGN_LEFT|wx.EXPAND|wx.ALL, 5)
+#            sizer.Add(wx.StaticLine(self, -1), 0, wx.EXPAND|wx.ALL, 5)
+
+        sizer.Fit(self)
+#        sizer.Add(self.grid, 0, wx.EXPAND|wx.ALL, 5)
 
 ########################################################################
 class WizardPanel(wx.Panel):
@@ -212,6 +212,7 @@ class WizardPanel(wx.Panel):
         wx.Panel.__init__(self, parent=parent)
         self.pages = []
         self.page_num = 0
+#        Logger.print("WizardPanel __init__()")
 
         self.mainSizer = wx.BoxSizer(wx.VERTICAL)
         self.panelSizer = wx.BoxSizer(wx.VERTICAL)
@@ -230,14 +231,18 @@ class WizardPanel(wx.Panel):
         self.mainSizer.Add(self.panelSizer, 1, wx.EXPAND)
         self.mainSizer.Add(btnSizer, 0, wx.EXPAND)
         self.SetSizer(self.mainSizer)
+        self.mainSizer.Fit(self)
 
 
     #----------------------------------------------------------------------
     def addPage(self, title, pageId=""):
         """"""
 
+        Logger.print("addPage() -> %s" % (title))
+
         panel = WizardPage(self, title, pageId)
         self.panelSizer.Add(panel, 2, wx.EXPAND)
+        self.panelSizer.Fit(self)
         self.pages.append(panel)
         if len(self.pages) > 1:
             # hide all panels after the first one
@@ -617,6 +622,7 @@ class ImportModelTableGrid(gridlib.Grid):
     def __init__(self, parent, log, paths):
         gridlib.Grid.__init__(self, parent, -1)
 
+        self.table = None
         self.table = ModelImportDataTable(log)
         # Read paths file
         self.load(paths)
@@ -653,7 +659,9 @@ class ImportModelTableGrid(gridlib.Grid):
             doImport = 1
 
             self.data.append([attrId, attrName, attrType, attrDesc, doImport])
-            self.table.SetData(self.data)
+
+            if self.table:
+                self.table.SetData(self.data)
 
             rowNum = rowNum + 1
             attrId = attrIdOffset + rowNum
@@ -670,7 +678,8 @@ class ImportDataAccessTableGrid(gridlib.Grid):
     def __init__(self, parent, log, imports):
         gridlib.Grid.__init__(self, parent, -1)
 
-        self.table = ModelDataAccessTable(log)
+        self.table = None
+        #self.table = ModelDataAccessTable(log)
 
         self.data = []
         self.load()
@@ -678,7 +687,7 @@ class ImportDataAccessTableGrid(gridlib.Grid):
         # The second parameter means that the grid is to take ownership of the
         # table and will destroy it when done.  Otherwise you would need to keep
         # a reference to it and call it's Destroy method later.
-        self.SetTable(self.table, True)
+        #self.SetTable(self.table, True)
 
         self.SetRowLabelSize(0)
         self.SetMargins(0,0)
@@ -700,7 +709,8 @@ class ImportDataAccessTableGrid(gridlib.Grid):
 
         self.data.append([0, '', '', '', 0, 0])
         #self.data.append([attrId, attrName, attrType, attrDesc, doImport])
-        self.table.SetData(self.data)
+        if self.table:
+            self.table.SetData(self.data)
 
     def reload(self):
         Logger.print('Reload %d rows of data.' % len(self.data))
@@ -1147,7 +1157,7 @@ class LoadModelDialog(wx.Dialog):
             self.modelFileText.SetValue(pathList)
 
 
-    # Compare this with the debug above; did we change working dirs?
+        # Compare this with the debug above; did we change working dirs?
         Logger.print("CWD: %s\n" % os.getcwd())
 
         # Destroy the dialog. Don't do this until you are done with it!
@@ -1158,10 +1168,7 @@ class LoadModelDialog(wx.Dialog):
 
         # Create wizardFrame
         wizardFrame = WizardFrame(self, path, wx.ID_ANY, "Load Model Wizard", size=(1024, 500))
-
-        # Call our wizard
-    #            self.OnRunLoadModelWizard(paths)
-
+        wizardFrame.Show()
 
 #    if wizard.RunWizard(page1):
 #            wx.MessageBox("Wizard completed successfully", "Load Model complete.")
@@ -1270,14 +1277,15 @@ class WizardFrame(wx.Frame):
 
     def __init__(self, parent, path, id=-1, title="", pos=wx.DefaultPosition,
                  size=wx.DefaultSize, style=wx.DEFAULT_FRAME_STYLE |
-                                            wx.SUNKEN_BORDER |
-                                            wx.CLIP_CHILDREN):
+                                            wx.SUNKEN_BORDER):
+                                            #|
+                                            #wx.CLIP_CHILDREN):
 
-        wx.Frame.__init__(self, parent, id, title, pos, size, style)
+        frame = wx.Frame.__init__(self, parent, id, title, pos, size, style)
         self.path = path
 
         # Page 1 (Step 1: Verify data header)
-        self.modelGrid = ImportModelTableGrid(self, log, path)
+        #self.modelGrid = ImportModelTableGrid(self, log, path)
 
         imports = path
         # Page 2 (Step 2: Set accessible data)
@@ -1288,7 +1296,8 @@ class WizardFrame(wx.Frame):
         self.panel.addPage("Step 2: Data access", "p2")
         self.panel.addPage("Step 3: Data storage location", "p3")
         self.panel.addPage("Step 4: Timing", "p4")
-        self.Show()
+
+
 
 
 
