@@ -180,26 +180,23 @@ class WizardPage(wx.Panel):
     """"""
 
     #----------------------------------------------------------------------
-    def __init__(self, parent, title, pageId=""):
+    def __init__(self, parent, title, grid):
         """Constructor"""
         wx.Panel.__init__(self, parent)
 
         sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.SetSizer(sizer)
+#        self.SetSizer(sizer)
 
-        if pageId:
-            self.pageId = pageId
-
-#        if grid:
-#            self.grid = grid
+        if grid:
+            self.grid = grid
 
         if title:
             title = wx.StaticText(self, -1, title)
             title.SetFont(wx.Font(8, wx.SWISS, wx.NORMAL, wx.BOLD))
             sizer.Add(title, 0, wx.ALIGN_LEFT|wx.EXPAND|wx.ALL, 5)
-#            sizer.Add(wx.StaticLine(self, -1), 0, wx.EXPAND|wx.ALL, 5)
+            sizer.Add(wx.StaticLine(self, -1), 0, wx.EXPAND|wx.ALL, 5)
 
-        sizer.Fit(self)
+        self.SetSizerAndFit(sizer)
 #        sizer.Add(self.grid, 0, wx.EXPAND|wx.ALL, 5)
 
 ########################################################################
@@ -207,7 +204,7 @@ class WizardPanel(wx.Panel):
     """"""
 
     #----------------------------------------------------------------------
-    def __init__(self, parent):
+    def __init__(self, parent, modelGrid, dataAccessGrid):
         """Constructor"""
         wx.Panel.__init__(self, parent=parent)
         self.pages = []
@@ -230,17 +227,24 @@ class WizardPanel(wx.Panel):
         # finish layout
         self.mainSizer.Add(self.panelSizer, 1, wx.EXPAND)
         self.mainSizer.Add(btnSizer, 0, wx.EXPAND)
-        self.SetSizer(self.mainSizer)
-        self.mainSizer.Fit(self)
+#        self.SetSizer(self.mainSizer)
+#        self.mainSizer.Fit(self)
+        self.SetSizerAndFit(self.mainSizer) # use the sizer for layout and size window
+
+        self.modelGrid = modelGrid
+        self.modelGrid.Hide()
+        self.dataAccessGrid = dataAccessGrid
+        self.dataAccessGrid.Hide()
+        self.OnWizPageChanged()
 
 
-    #----------------------------------------------------------------------
-    def addPage(self, title, pageId=""):
+#----------------------------------------------------------------------
+    def addPage(self, title, grid=None):
         """"""
 
         Logger.print("addPage() -> %s" % (title))
 
-        panel = WizardPage(self, title, pageId)
+        panel = WizardPage(self, title, grid)
         self.panelSizer.Add(panel, 2, wx.EXPAND)
         self.panelSizer.Fit(self)
         self.pages.append(panel)
@@ -252,6 +256,8 @@ class WizardPanel(wx.Panel):
     #----------------------------------------------------------------------
     def onNext(self, event):
         """"""
+        self.OnWizPageChanging()
+
         pageCount = len(self.pages)
         if pageCount-1 != self.page_num:
             self.pages[self.page_num].Hide()
@@ -269,6 +275,8 @@ class WizardPanel(wx.Panel):
             # change label
             self.nextBtn.SetLabel("Finish")
 
+        self.OnWizPageChanged()
+
     #----------------------------------------------------------------------
     def onPrev(self, event):
         """"""
@@ -281,6 +289,120 @@ class WizardPanel(wx.Panel):
         else:
             Logger.print("You're already on the first page!")
 
+#----------------------------------------------------------------------
+    def OnWizPageChanged(self):
+
+#        page = self.pages[self.page_num]
+        if self.page_num == 1:
+            Logger.print("Caught OnWizPageChanged to: page %s\n" % (self.page_num))
+            self.modelGrid.Show()
+
+        if self.page_num == 2:
+            Logger.print("Caught OnWizPageChanged to: page %s\n" % (self.page_num))
+            self.dataAccessGrid.Show()
+
+            # Read page 1 and filter data for page2
+            self.dataAccessGrid.data = []
+
+            i = 0
+            rowNum = 1
+            attrId = 1
+            attrIdOffset = 0
+            while i < len(self.p1FilterData):
+                # On doImport
+                Logger.print("i = %d" % (i))
+
+                if len(self.p1FilterData) > 0:
+                    Logger.print("Set data access for field: %s" % (self.p1FilterData[i][1]))
+
+                    attrId = i
+                    attrName = self.p1FilterData[i][1]
+                    user = self.p1FilterData[i][2] # TODO: Integrate with real user system
+                    role = self.p1FilterData[i][3] # TODO: Integrate with real role system
+                    readAccess = self.p1FilterData[i][4]
+                    secureStore = self.p1FilterData[i][5]
+
+                    #id,i
+                    #attrName,s
+                    #user,c
+                    #role,c
+                    #readAccess,b
+                    #secureStore,b
+
+                    self.dataAccessGrid.data.append([attrId, attrName, user, role, readAccess, secureStore])
+                else:
+                    if len(self.p1FilterData) > 0:
+                        Logger.print("Rejecting data field %s" % (self.p1FilterData[i][1]))
+                i += 1
+
+            self.dataAccessGrid.reload()
+
+        if self.page_num == 3:
+            Logger.print("Caught OnWizPageChanged to: page %s\n" % (self.page_num))
+
+#        if (page.getId() == "p3"):
+#            Logger.print("Caught OnWizPageChanged of p3: %s, %s\n" % (dir, page.getId()))
+
+
+
+ #       Logger.print("OnWizPageChanged: %s, %s\n" % (dir, page.getId()))
+
+    def OnWizPageChanging(self):
+
+        page = self.pages[self.page_num]
+
+        Logger.print("Caught OnWizPageChanging to: page %s\n" % (self.page_num))
+
+        #        page = self.pages[self.page_num]
+        if self.page_num == 0 or self.page_num == 1:
+        #if (page.getId() == "p1"):
+            # Read page 1 and pass filter data to page 2
+            Logger.print("Read page 1 and pass filter data to page 2")
+
+            # Clear filter data
+            self.p1FilterData = []
+
+            # Populate a list with all fields with doImport
+            rowNum = 1
+            attrId = 1
+            attrIdOffset = 0
+
+            page.grid = self.modelGrid
+
+            i = 0
+            while i < len(page.grid.data):
+                # On doImport
+                Logger.print("i = %d" % (i))
+
+                if len(page.grid.data) > 0:
+                    Logger.print("Import data field: %s" % (page.grid.data[i][1]))
+
+                    # Check import field (index 4)
+                    if page.grid.data[i][4] == 1:
+                        # Set table to data set
+                        attrName = page.grid.data[i][1]
+                        user = "user A" # TODO: Integrate with real user system
+                        role = "admin" # TODO: Integrate with real role system
+                        doImport = 1
+                        doSecureStore = 1
+
+                        self.p1FilterData.append([attrId, attrName, user, role, doImport, doSecureStore])
+
+                    rowNum = rowNum + 1
+                    attrId = attrIdOffset + rowNum
+
+                else:
+                    if len(page.grid.data) > 0:
+                        Logger.print("Rejecting field %s" % (self.modelGrid.data[i][1]))
+                i += 1
+
+            Logger.print("Caught OnWizPageChanging from: page %s\n" % (self.page_num))
+
+        if self.page_num == 2:
+            Logger.print("Caught OnWizPageChanging from: page %s\n" % (self.page_num))
+
+        # Read page and filter data
+        #self.modelGrid.data = []
 
 ########################################################################
 #----------------------------------------------------------------------
@@ -622,7 +744,7 @@ class ImportModelTableGrid(gridlib.Grid):
     def __init__(self, parent, log, paths):
         gridlib.Grid.__init__(self, parent, -1)
 
-        self.table = None
+        #self.table = None
         self.table = ModelImportDataTable(log)
         # Read paths file
         self.load(paths)
@@ -678,8 +800,8 @@ class ImportDataAccessTableGrid(gridlib.Grid):
     def __init__(self, parent, log, imports):
         gridlib.Grid.__init__(self, parent, -1)
 
-        self.table = None
-        #self.table = ModelDataAccessTable(log)
+#        self.table = None
+        self.table = ModelDataAccessTable(log)
 
         self.data = []
         self.load()
@@ -687,7 +809,7 @@ class ImportDataAccessTableGrid(gridlib.Grid):
         # The second parameter means that the grid is to take ownership of the
         # table and will destroy it when done.  Otherwise you would need to keep
         # a reference to it and call it's Destroy method later.
-        #self.SetTable(self.table, True)
+        self.SetTable(self.table, True)
 
         self.SetRowLabelSize(0)
         self.SetMargins(0,0)
@@ -962,9 +1084,9 @@ class LoadModelDialog(wx.Dialog):
 
         btnsizer = wx.StdDialogButtonSizer()
 
-        if wx.Platform != "__WXMSW__":
-            btn = wx.ContextHelpButton(self)
-            btnsizer.AddButton(btn)
+#        if wx.Platform != "__WXMSW__":
+#            btn = wx.ContextHelpButton(self)
+#            btnsizer.AddButton(btn)
 
         btn = wx.Button(self, wx.ID_OK)
         btn.SetHelpText("Confirm Load")
@@ -988,142 +1110,6 @@ class LoadModelDialog(wx.Dialog):
 
         self.SetSizer(sizer)
         sizer.Fit(self)
-
-        self.Bind(wx.adv.EVT_WIZARD_PAGE_CHANGED, self.OnWizPageChanged)
-        self.Bind(wx.adv.EVT_WIZARD_PAGE_CHANGING, self.OnWizPageChanging)
-        self.Bind(wx.adv.EVT_WIZARD_CANCEL, self.OnWizCancel)
-
-    def OnWizPageChanged(self, evt):
-        if evt.GetDirection():
-            dir = "forward"
-        else:
-            dir = "backward"
-
-        page = evt.GetPage()
-
-        if (page.getId() == "p1"):
-            Logger.print("Caught OnWizPageChanged of p1: %s, %s\n" % (dir, page.getId()))
-
-        if (page.getId() == "p2"):
-            Logger.print("Caught OnWizPageChanged of p2: %s, %s\n" % (dir, page.getId()))
-            # Read page 1 and filter data for page2
-            self.dataAccessGrid.data = []
-
-            i = 0
-            rowNum = 1
-            attrId = 1
-            attrIdOffset = 0
-            while i < len(self.p1FilterData):
-                # On doImport
-                Logger.print("i = %d" % (i))
-
-                if len(self.p1FilterData) > 0:
-                    Logger.print("Set data access for field: %s" % (self.p1FilterData[i][1]))
-
-                    attrId = i
-                    attrName = self.p1FilterData[i][1]
-                    user = self.p1FilterData[i][2] # TODO: Integrate with real user system
-                    role = self.p1FilterData[i][3] # TODO: Integrate with real role system
-                    readAccess = self.p1FilterData[i][4]
-                    secureStore = self.p1FilterData[i][5]
-
-                    #id,i
-                    #attrName,s
-                    #user,c
-                    #role,c
-                    #readAccess,b
-                    #secureStore,b
-
-                    self.dataAccessGrid.data.append([attrId, attrName, user, role, readAccess, secureStore])
-                else:
-                    if len(self.p1FilterData) > 0:
-                        Logger.print("Rejecting data field %s" % (self.p1FilterData[i][1]))
-                i += 1
-
-            self.dataAccessGrid.reload()
-
-        if (page.getId() == "p3"):
-            Logger.print("Caught OnWizPageChanged of p3: %s, %s\n" % (dir, page.getId()))
-
-
-
-        Logger.print("OnWizPageChanged: %s, %s\n" % (dir, page.getId()))
-
-    def OnWizPageChanging(self, evt):
-        if evt.GetDirection():
-            dir = "forward"
-        else:
-            dir = "backward"
-
-        page = evt.GetPage()
-
-
-        if (page.getId() == "p1"):
-            # Read page 1 and pass filter data to page 2
-            Logger.print("Read page 1 and pass filter data to page 2")
-
-             # Clear filter data
-            self.p1FilterData = []
-
-            # Populate a list with all fields with doImport
-            rowNum = 1
-            attrId = 1
-            attrIdOffset = 0
-
-            i = 0
-            while i < len(self.modelGrid.data):
-                # On doImport
-                Logger.print("i = %d" % (i))
-
-                if len(self.modelGrid.data) > 0:
-                    Logger.print("Import data field: %s" % (self.modelGrid.data[i][1]))
-
-                    # Check import field (index 4)
-                    if self.modelGrid.data[i][4] == 1:
-                        # Set table to data set
-                        attrName = self.modelGrid.data[i][1]
-                        user = "user A" # TODO: Integrate with real user system
-                        role = "admin" # TODO: Integrate with real role system
-                        doImport = 1
-                        doSecureStore = 1
-
-                        self.p1FilterData.append([attrId, attrName, user, role, doImport, doSecureStore])
-
-                    rowNum = rowNum + 1
-                    attrId = attrIdOffset + rowNum
-
-                else:
-                    if len(self.modelGrid.data) > 0:
-                        Logger.print("Rejecting field %s" % (self.modelGrid.data[i][1]))
-                i += 1
-
-            Logger.print("Caught OnWizPageChanged of p1: %s, %s\n" % (dir, page.getId()))
-
-
-
-        if (page.getId() == "p2"):
-            Logger.print("Caught OnWizPageChanged of p2: %s, %s\n" % (dir, page.getId()))
-
-
-        # Read page and filter data
-        #self.modelGrid.data = []
-
-        Logger.print("OnWizPageChanging: %s, %s\n" % (dir, page.__class__))
-
-
-    def OnWizCancel(self, evt):
-        if evt.GetDirection():
-            dir = "forward"
-        else:
-            dir = "backward"
-
-        page = evt.GetPage()
-
-        # Read page and filter data
-        #self.modelGrid.data = []
-
-        Logger.print("OnWizCancel: %s, %s\n" % (dir, page.__class__))
-
 
     def OnCreateOpenDialog(self):
         Logger.print("CWD: %s\n" % os.getcwd())
@@ -1295,17 +1281,18 @@ class WizardFrame(wx.Frame):
         self.path = path
 
         # Page 1 (Step 1: Verify data header)
-        #self.modelGrid = ImportModelTableGrid(self, log, path)
+        self.modelGrid = ImportModelTableGrid(self, log, path)
 
         imports = path
         # Page 2 (Step 2: Set accessible data)
-#        self.dataAccessGrid = ImportDataAccessTableGrid(self, log, imports)
+        self.dataAccessGrid = ImportDataAccessTableGrid(self, log, imports)
 
-        self.panel = WizardPanel(self)
-        self.panel.addPage("Step 1: Verify data header", "p1")
-        self.panel.addPage("Step 2: Data access", "p2")
-        self.panel.addPage("Step 3: Data storage location", "p3")
-        self.panel.addPage("Step 4: Timing", "p4")
+        self.panel = WizardPanel(self, self.modelGrid, self.dataAccessGrid)
+        self.panel.addPage("Welcome to Load Model Wizard")
+        self.panel.addPage("Step 1: Verify data header")
+        self.panel.addPage("Step 2: Data access")
+        self.panel.addPage("Step 3: Data storage location")
+        self.panel.addPage("Step 4: Timing")
         self.panel.SetFocus()
 
 
