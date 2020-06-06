@@ -180,24 +180,20 @@ class WizardPage(wx.Panel):
     """"""
 
     #----------------------------------------------------------------------
-    def __init__(self, parent, title, grid):
+    def __init__(self, parent, title):
         """Constructor"""
         wx.Panel.__init__(self, parent)
 
         sizer = wx.BoxSizer(wx.HORIZONTAL)
 #        self.SetSizer(sizer)
 
-        if grid:
-            self.grid = grid
-
         if title:
             title = wx.StaticText(self, -1, title)
             title.SetFont(wx.Font(8, wx.SWISS, wx.NORMAL, wx.BOLD))
-            sizer.Add(title, 0, wx.ALIGN_LEFT|wx.EXPAND|wx.ALL, 5)
+            sizer.Add(title, 1, wx.ALIGN_LEFT|wx.EXPAND|wx.ALL, 5)
             sizer.Add(wx.StaticLine(self, -1), 0, wx.EXPAND|wx.ALL, 5)
 
         self.SetSizerAndFit(sizer)
-#        sizer.Add(self.grid, 0, wx.EXPAND|wx.ALL, 5)
 
 ########################################################################
 class WizardPanel(wx.Panel):
@@ -212,8 +208,19 @@ class WizardPanel(wx.Panel):
 #        Logger.print("WizardPanel __init__()")
 
         self.mainSizer = wx.BoxSizer(wx.VERTICAL)
+        self.mainSizer.SetSizeHints(self)
+
+        self.gridSizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.gridSizer.SetSizeHints(self)
+
+        self.gridSizer.Add(modelGrid, 0, wx.EXPAND|wx.ALL, 5)
+        self.gridSizer.Add(dataAccessGrid, 0, wx.EXPAND|wx.ALL, 5)
+
         self.panelSizer = wx.BoxSizer(wx.VERTICAL)
+        self.panelSizer.SetSizeHints(self)
+
         btnSizer = wx.BoxSizer(wx.HORIZONTAL)
+#        btnSizer.SetSizeHints(self)
 
         # add prev/next buttons
         self.prevBtn = wx.Button(self, label="Previous")
@@ -225,10 +232,10 @@ class WizardPanel(wx.Panel):
         btnSizer.Add(self.nextBtn, 0, wx.ALL, 5)
 
         # finish layout
-        self.mainSizer.Add(self.panelSizer, 1, wx.EXPAND)
-        self.mainSizer.Add(btnSizer, 0, wx.EXPAND)
-#        self.SetSizer(self.mainSizer)
-#        self.mainSizer.Fit(self)
+        self.mainSizer.Add(self.panelSizer, 0, wx.EXPAND | wx.ALL)
+        self.mainSizer.Add(self.gridSizer,2, wx.EXPAND | wx.ALL)
+        self.mainSizer.Add(btnSizer, 1, wx.EXPAND | wx.ALL)
+        self.SetSizer(self.mainSizer)
         self.SetSizerAndFit(self.mainSizer) # use the sizer for layout and size window
 
         self.modelGrid = modelGrid
@@ -239,12 +246,12 @@ class WizardPanel(wx.Panel):
 
 
 #----------------------------------------------------------------------
-    def addPage(self, title, grid=None):
+    def addPage(self, title):
         """"""
 
         Logger.print("addPage() -> %s" % (title))
 
-        panel = WizardPage(self, title, grid)
+        panel = WizardPage(self, title)
         self.panelSizer.Add(panel, 2, wx.EXPAND)
         self.panelSizer.Fit(self)
         self.pages.append(panel)
@@ -1168,6 +1175,7 @@ class LoadModelDialog(wx.Dialog):
         wizardFrame.Show()
         wizardFrame.SetFocus()
 
+
 #            wx.MessageBox("Wizard completed successfully", "Load Model complete.")
 #            wx.MessageBox("Wizard was cancelled", "Load Model incomplete!")
 
@@ -1598,7 +1606,7 @@ class PyAUIFrame(wx.Frame):
     def OnTool102(self):
         Logger.print('Tool 102');
         dlg = LoadModelDialog(self, -1, "Load Model", size=(350, 200),
-                         style=wx.DEFAULT_DIALOG_STYLE|wx.DIALOG_NO_PARENT)
+                         style=wx.DEFAULT_DIALOG_STYLE|wx.RESIZE_BORDER)
         dlg.ShowWindowModal()
 
     def OnTool103(self):
