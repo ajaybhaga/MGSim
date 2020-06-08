@@ -216,16 +216,18 @@ class WizardPanel(wx.Panel):
         # Page 2 (Step 2: Set accessible data)
         self.dataAccessGrid = ImportDataAccessTableGrid(self, log, imports)
 
-        self.SetSize(wx.Size(800, 600))
+#        self.SetSize(wx.Size(800, 600))
 
         self.mainSizer = wx.BoxSizer(wx.VERTICAL)
         self.mainSizer.SetSizeHints(self)
+#        self.mainSizer.SetMinSize(wx.Size(1024, 100))
 
         self.gridSizer = wx.BoxSizer(wx.HORIZONTAL)
         self.gridSizer.SetSizeHints(self)
 
-        self.gridSizer.Add(self.modelGrid, 0, wx.EXPAND|wx.ALL, 5)
-        self.gridSizer.Add(self.dataAccessGrid, 0, wx.EXPAND|wx.ALL, 5)
+        self.gridSizer.Add(self.modelGrid, 1, wx.EXPAND|wx.ALL, 5)
+        self.gridSizer.Add(self.dataAccessGrid, 1, wx.EXPAND|wx.ALL, 5)
+        self.gridSizer.Layout()
 
         #txt = "Click next to get started."
         #self.firstStepGridText = wx.StaticText(self, -1, txt)
@@ -237,9 +239,11 @@ class WizardPanel(wx.Panel):
 
         self.panelSizer = wx.BoxSizer(wx.VERTICAL)
         self.panelSizer.SetSizeHints(self)
+        self.panelSizer.SetMinSize(wx.Size(1024, 10))
+
 
         btnSizer = wx.BoxSizer(wx.HORIZONTAL)
-#        btnSizer.SetSizeHints(self)
+        btnSizer.SetSizeHints(self)
 
         # add prev/next buttons
         self.prevBtn = wx.Button(self, label="Previous")
@@ -250,17 +254,40 @@ class WizardPanel(wx.Panel):
         self.nextBtn.Bind(wx.EVT_BUTTON, self.onNext)
         btnSizer.Add(self.nextBtn, 0, wx.ALL, 5)
 
+#        self.SetAutoLayout(True)
+
         # finish layout
-        self.mainSizer.Add(self.panelSizer, 1, wx.EXPAND | wx.ALL)
+        self.mainSizer.Add(self.panelSizer, 3, wx.EXPAND | wx.ALL)
         self.mainSizer.Add(self.gridSizer,2, wx.EXPAND | wx.ALL)
-        self.mainSizer.Add(btnSizer, 2, wx.EXPAND | wx.ALL)
+        self.mainSizer.Add(btnSizer, 1, wx.EXPAND | wx.ALL)
         self.SetSizerAndFit(self.mainSizer) # use the sizer for layout and size window
+        self.Layout()
+
         #self.SetSizer(self.mainSizer)
+
+        self.Bind(wx.EVT_SIZE, self.OnSize)
+        self.Bind(wx.EVT_IDLE, self.OnIdle)
 
         self.modelGrid.Hide()
         self.dataAccessGrid.Hide()
         self.OnWizPageChanged()
 
+#        self.GetEventHandler().ProcessEvent(wx.EVT_SIZE)
+#        wx.PostEvent(self, wx.EVT_SIZE)
+
+
+#        wx.PostEvent(dest, event)
+
+
+    def OnSize(self,event):
+        self.resized = True # set dirty
+
+    def OnIdle(self,event):
+#        Logger.print("OnIdle")
+        if self.resized:
+            # take action if the dirty flag is set
+            Logger.print("New size: %s" % self.GetSize())
+            self.resized = False # reset the flag
 
 #----------------------------------------------------------------------
     def addPage(self, title):
