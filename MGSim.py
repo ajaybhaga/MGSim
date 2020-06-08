@@ -78,6 +78,8 @@ import wx.adv
 from wx.adv import Wizard as wiz
 from wx.adv import WizardPage, WizardPageSimple
 
+import wx.lib.inspection
+import wx.lib.mixins.inspection
 
 
 ID_CreateTree = wx.NewIdRef()
@@ -184,28 +186,37 @@ class WizardPage(wx.Panel):
         """Constructor"""
         wx.Panel.__init__(self, parent)
 
-        sizer = wx.BoxSizer(wx.HORIZONTAL)
-#        self.SetSizer(sizer)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        self.SetSizer(sizer)
 
         if title:
             title = wx.StaticText(self, -1, title)
-            title.SetFont(wx.Font(8, wx.SWISS, wx.NORMAL, wx.BOLD))
-            sizer.Add(title, 1, wx.ALIGN_LEFT|wx.EXPAND|wx.ALL, 5)
+            title.SetFont(wx.Font(14, wx.SWISS, wx.NORMAL, wx.BOLD))
+            sizer.Add(title, 0, wx.ALIGN_LEFT|wx.EXPAND|wx.ALL, 5)
             sizer.Add(wx.StaticLine(self, -1), 0, wx.EXPAND|wx.ALL, 5)
 
-        self.SetSizerAndFit(sizer)
+        #self.SetSizerAndFit(sizer)
 
 ########################################################################
 class WizardPanel(wx.Panel):
     """"""
 
     #----------------------------------------------------------------------
-    def __init__(self, parent, modelGrid, dataAccessGrid):
+    def __init__(self, path, parent):
         """Constructor"""
         wx.Panel.__init__(self, parent=parent)
         self.pages = []
         self.page_num = 0
 #        Logger.print("WizardPanel __init__()")
+
+        # Page 1 (Step 1: Verify data header)
+        self.modelGrid = ImportModelTableGrid(self, log, path)
+
+        imports = path
+        # Page 2 (Step 2: Set accessible data)
+        self.dataAccessGrid = ImportDataAccessTableGrid(self, log, imports)
+
+        self.SetSize(wx.Size(800, 600))
 
         self.mainSizer = wx.BoxSizer(wx.VERTICAL)
         self.mainSizer.SetSizeHints(self)
@@ -213,8 +224,16 @@ class WizardPanel(wx.Panel):
         self.gridSizer = wx.BoxSizer(wx.HORIZONTAL)
         self.gridSizer.SetSizeHints(self)
 
-        self.gridSizer.Add(modelGrid, 0, wx.EXPAND|wx.ALL, 5)
-        self.gridSizer.Add(dataAccessGrid, 0, wx.EXPAND|wx.ALL, 5)
+        self.gridSizer.Add(self.modelGrid, 0, wx.EXPAND|wx.ALL, 5)
+        self.gridSizer.Add(self.dataAccessGrid, 0, wx.EXPAND|wx.ALL, 5)
+
+        #txt = "Click next to get started."
+        #self.firstStepGridText = wx.StaticText(self, -1, txt)
+        #self.firstStepGridText.SetFont(wx.Font(8, wx.SWISS, wx.NORMAL, wx.BOLD))
+#        self.gridSizer.Add(self.firstStepGridText, 0, wx.ALIGN_LEFT|wx.EXPAND|wx.ALL, 5)
+
+#        self.gridSizer.Add(modelGrid, 0, wx.EXPAND|wx.ALL, 5)
+#        self.gridSizer.Add(dataAccessGrid, 0, wx.EXPAND|wx.ALL, 5)
 
         self.panelSizer = wx.BoxSizer(wx.VERTICAL)
         self.panelSizer.SetSizeHints(self)
@@ -232,15 +251,13 @@ class WizardPanel(wx.Panel):
         btnSizer.Add(self.nextBtn, 0, wx.ALL, 5)
 
         # finish layout
-        self.mainSizer.Add(self.panelSizer, 0, wx.EXPAND | wx.ALL)
+        self.mainSizer.Add(self.panelSizer, 1, wx.EXPAND | wx.ALL)
         self.mainSizer.Add(self.gridSizer,2, wx.EXPAND | wx.ALL)
-        self.mainSizer.Add(btnSizer, 1, wx.EXPAND | wx.ALL)
-        self.SetSizer(self.mainSizer)
+        self.mainSizer.Add(btnSizer, 2, wx.EXPAND | wx.ALL)
         self.SetSizerAndFit(self.mainSizer) # use the sizer for layout and size window
+        #self.SetSizer(self.mainSizer)
 
-        self.modelGrid = modelGrid
         self.modelGrid.Hide()
-        self.dataAccessGrid = dataAccessGrid
         self.dataAccessGrid.Hide()
         self.OnWizPageChanged()
 
@@ -252,6 +269,7 @@ class WizardPanel(wx.Panel):
         Logger.print("addPage() -> %s" % (title))
 
         panel = WizardPage(self, title)
+        panel.SetSize(wx.Size(800, 600))
         self.panelSizer.Add(panel, 2, wx.EXPAND)
         self.panelSizer.Fit(self)
         self.pages.append(panel)
@@ -284,7 +302,7 @@ class WizardPanel(wx.Panel):
 
         self.OnWizPageChanged()
 
-    #----------------------------------------------------------------------
+    #---------------                                                                                                                                                                                                                                                                                      -------------------------------------------------------
     def onPrev(self, event):
         """"""
         pageCount = len(self.pages)
@@ -299,14 +317,44 @@ class WizardPanel(wx.Panel):
 #----------------------------------------------------------------------
     def OnWizPageChanged(self):
 
+        self.modelGrid.Hide()
+        self.dataAccessGrid.Hide()
+
+#        if self.page_num == 0:
+#            self.modelGrid.Hide()
+#            self.dataAccessGrid.Hide()
+
 #        page = self.pages[self.page_num]
         if self.page_num == 1:
             Logger.print("Caught OnWizPageChanged to: page %s\n" % (self.page_num))
             self.modelGrid.Show()
+            self.dataAccessGrid.Hide()
+
+            #self.gridSizer.Remove(self.firstStepGridText)
+      #      self.gridSizer.Remove(self.modelGrid)
+            #self.gridSizer.Remove(self.dataAccessGrid)
+
+            #self.gridSizer.Add(self.firstStepGridText, 0, wx.ALIGN_LEFT|wx.EXPAND|wx.ALL, 5)
+
+            #self.gridSizer.Add(self.dataAccessGrid, 0, wx.EXPAND|wx.ALL, 5)
+
+#        self.gridSizer.Add(self.firstStepGridText, 0, wx.ALIGN_LEFT|wx.EXPAND|wx.ALL, 5)
+
+#        self.gridSizer.Add(modelGrid, 0, wx.EXPAND|wx.ALL, 5)
+#        self.gridSizer.Add(dataAccessGrid, 0, wx.EXPAND|wx.ALL, 5)
+
 
         if self.page_num == 2:
             Logger.print("Caught OnWizPageChanged to: page %s\n" % (self.page_num))
+            self.modelGrid.Hide()
             self.dataAccessGrid.Show()
+
+            #self.gridSizer.Remove(self.firstStepGridText)
+            #self.gridSizer.Remove(self.modelGrid)
+            #self.gridSizer.Remove(self.dataAccessGrid)
+
+            #self.gridSizer.Add(self.firstStepGridText, 0, wx.ALIGN_LEFT|wx.EXPAND|wx.ALL, 5)
+            #self.gridSizer.Add(self.modelGrid, 0, wx.EXPAND|wx.ALL, 5)
 
             # Read page 1 and filter data for page2
             self.dataAccessGrid.data = []
@@ -346,11 +394,20 @@ class WizardPanel(wx.Panel):
 
         if self.page_num == 3:
             Logger.print("Caught OnWizPageChanged to: page %s\n" % (self.page_num))
+            self.modelGrid.Hide()
+            self.dataAccessGrid.Hide()
+
+            self.gridSizer.Remove(self.firstStepGridText)
+            self.gridSizer.Remove(self.modelGrid)
+            self.gridSizer.Remove(self.dataAccessGrid)
+
 
 #        if (page.getId() == "p3"):
 #            Logger.print("Caught OnWizPageChanged of p3: %s, %s\n" % (dir, page.getId()))
 
-
+#        self.mainSizer.Fit(self.ma)
+        self.SetSizerAndFit(self.mainSizer)
+        self.Update()
 
  #       Logger.print("OnWizPageChanged: %s, %s\n" % (dir, page.getId()))
 
@@ -1183,7 +1240,7 @@ class LoadModelDialog(wx.Dialog):
         self.OnCreateOpenDialog()
 
     def OnLoadModelButton(self, evt):
-
+        wx.lib.inspection.InspectionTool().Show()
         Logger.print("OnLoadModelButton()")
         #loadModelName = self.modelNameText.GetValue()
         loadModelFile = self.modelFileText.GetValue()
@@ -1288,24 +1345,17 @@ class WizardFrame(wx.Frame):
         frame = wx.Frame.__init__(self, parent, id, title, pos, size, style)
         self.path = path
 
-        # Page 1 (Step 1: Verify data header)
-        self.modelGrid = ImportModelTableGrid(self, log, path)
+        self.SetSize(size)
+        self.SetMinSize(size)
 
-        imports = path
-        # Page 2 (Step 2: Set accessible data)
-        self.dataAccessGrid = ImportDataAccessTableGrid(self, log, imports)
-
-        self.panel = WizardPanel(self, self.modelGrid, self.dataAccessGrid)
+        self.panel = WizardPanel(path, self)
         self.panel.addPage("Welcome to Load Model Wizard")
         self.panel.addPage("Step 1: Verify data header")
         self.panel.addPage("Step 2: Data access")
         self.panel.addPage("Step 3: Data storage location")
         self.panel.addPage("Step 4: Timing")
+        self.panel.SetSize(wx.Size(800, 600))
         self.panel.SetFocus()
-
-
-
-
 
 #---------------------------------------------------------------------------
 
@@ -2538,7 +2588,7 @@ class MainPanel(wx.Panel):
         frame = PyAUIFrame(self, wx.ID_ANY, "Message Gateway Simulator", size=(1024, 768))
         frame.Show()
 
-class RunWxApp(wx.App):
+class RunWxApp(wx.App, wx.lib.mixins.inspection.InspectionMixin):
     def __init__(self, name):
         self.name = name
         wx.App.__init__(self, redirect=False)
@@ -2548,6 +2598,8 @@ class RunWxApp(wx.App):
         wx.Log.SetActiveTarget(wx.LogStderr())
 
         self.SetAssertMode(assertMode)
+
+        self.InitInspection()  # for the InspectionMixin base class
 
         baseFrame = wx.Frame(None, -1, self.name, size=(0,0),
                          style=wx.DEFAULT_FRAME_STYLE, name=self.name)
@@ -2577,6 +2629,7 @@ class RunWxApp(wx.App):
     def OnLoadModel(self, evt):
         a = 1
         #wx.lib.inspection.InspectionTool().Show()
+        wx.lib.inspection.InspectionTool().Show()
 
 def build_arg_parser(args):
     arg_parser = ArgParser()
